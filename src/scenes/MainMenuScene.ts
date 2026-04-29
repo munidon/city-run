@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
+import { RunState } from "@/state/RunState";
 
 export class MainMenuScene extends Phaser.Scene {
   constructor() {
@@ -43,7 +44,7 @@ export class MainMenuScene extends Phaser.Scene {
       repeat: -1,
     });
 
-    const start = () => this.scene.start("GameScene");
+    const start = () => this.scene.start("GameScene", { run: new RunState() });
     this.input.on("pointerdown", start);
     this.input.keyboard?.on("keydown-SPACE", start);
     this.input.keyboard?.on("keydown-ENTER", start);

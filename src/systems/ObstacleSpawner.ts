@@ -30,6 +30,7 @@ export class ObstacleSpawner {
     private readonly scene: Phaser.Scene,
     private readonly getProgress: () => number,
     private readonly getSpeed: () => number,
+    private readonly densityMul: number = 1,
   ) {
     this.group = scene.physics.add.group({ classType: Obstacle, runChildUpdate: false });
   }
@@ -41,7 +42,8 @@ export class ObstacleSpawner {
     if (this.timeUntilNextMs <= 0) {
       this.spawn();
       const phase = this.currentPhase();
-      this.timeUntilNextMs = Phaser.Math.Between(phase.interval.minMs, phase.interval.maxMs);
+      const next = Phaser.Math.Between(phase.interval.minMs, phase.interval.maxMs);
+      this.timeUntilNextMs = Math.max(450, next / this.densityMul);
     }
 
     const speed = this.getSpeed();

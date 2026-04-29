@@ -13,6 +13,7 @@ import { DisasterSystem } from "@/systems/DisasterSystem";
 import { HUD } from "@/ui/HUD";
 import { QuizModal } from "@/ui/QuizModal";
 import { pickRandomQuiz } from "@/data/quizzes";
+import { RunState } from "@/state/RunState";
 
 const SWIPE_THRESHOLD_PX = 40;
 const COLLISION_IFRAMES_MS = 700;
@@ -40,6 +41,8 @@ export class GameScene extends Phaser.Scene {
   private quizActive = false;
   private quiz?: QuizModal;
   private chase?: ChaseShadow;
+  private run!: RunState;
+  private stageCoinDelta = 0;
 
   private touchStart?: { x: number; y: number; time: number };
 
@@ -47,11 +50,16 @@ export class GameScene extends Phaser.Scene {
     super("GameScene");
   }
 
+  init(data: { run?: RunState }): void {
+    this.run = data?.run ?? new RunState();
+  }
+
   create(): void {
     this.gameOver = false;
     this.cleared = false;
     this.elapsedSec = 0;
     this.coins = 0;
+    this.stageCoinDelta = 0;
     this.iframesUntil = 0;
     this.quizActive = false;
 
@@ -61,11 +69,22 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, PLAYER_X, GROUND_Y);
     this.physics.add.collider(this.player, this.groundBody);
 
-    this.health = new HealthSystem(100, 1.5);
+    const maxHp = this.run.maxHp;
+    this.health = new HealthSystem(maxHp, 1.5);
+    if (this.run.pendingFullHeal) {
+      this.health.reset();
+    } else if (this.run.pendingStartHpRatio !== null) {
+      this.health.damage(maxHp * (1 - this.run.pendingStartHpRatio));
+    }
     this.stage = new StageSystem();
     this.disaster = new DisasterSystem();
 
-    this.obstacles = new ObstacleSpawner(this, () => this.stage.progress, () => this.currentSpeed());
+    this.obstacles = new ObstacleSpawner(
+      this,
+      () => this.stage.progress,
+      () => this.currentSpeed(),
+      this.run.obstacleDensityMul,
+    );
     this.items = new ItemSpawner(this, () => this.currentSpeed());
 
     this.physics.add.collider(this.obstacles.group, this.groundBody);
@@ -78,8 +97,8 @@ export class GameScene extends Phaser.Scene {
     this.health.onChange((cur, max) => this.hud.setHealth(cur, max));
     this.stage.onChange((p) => this.hud.setProgress(p));
     this.stage.onCheckpoint((cp) => this.handleCheckpoint(cp));
-    this.hud.setStageLabel("Stage 1-1 (PoC)");
-    this.hud.setCoins(0);
+    this.hud.setStageLabel(`Stage 1-${this.run.stageIndex}`);
+    this.hud.setCoins(this.run.totalCoins);
 
     this.disaster.onTrigger(() => {
       this.hud.setDisasterStatus("⚠ 재난 가속 — 두루마리를 찾아라!");
@@ -141,7 +160,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private currentSpeed(): number {
-    return BASE_SPEED * this.stage.speedMultiplier * (1 + this.disaster.speedBonus);
+    const stageBoost = 1 + (this.run.stageIndex - 1) * 0.07;
+    return BASE_SPEED * this.stage.speedMultiplier * (1 + this.disaster.speedBonus) * stageBoost;
   }
 
   private handleObstacleHit(_player: unknown, obstacleObj: unknown): void {
@@ -169,10 +189,16 @@ export class GameScene extends Phaser.Scene {
     if (item.consumed) return;
     item.consumed = true;
 
-    if (item.healPct > 0) this.health.heal(item.healPct);
+    if (item.healPct > 0) {
+      const heal = item.healPct * this.run.healMul * this.run.pendingRewardMul;
+      this.health.heal(heal);
+    }
     if (item.coins > 0) {
-      this.coins += item.coins;
-      this.hud.setCoins(this.coins);
+      const coinMul = this.run.coinMul * this.run.pendingRewardMul * (this.run.pendingDoubleCoin ? 2 : 1);
+      const earned = Math.round(item.coins * coinMul);
+      this.coins += earned;
+      this.stageCoinDelta += earned;
+      this.hud.setCoins(this.run.totalCoins + this.stageCoinDelta);
     }
 
     this.tweens.add({
@@ -202,8 +228,11 @@ export class GameScene extends Phaser.Scene {
     this.quiz = new QuizModal(this, question, (result) => {
       this.quiz = undefined;
       if (result === "correct") {
-        this.coins += QUIZ_BONUS_COINS;
-        this.hud.setCoins(this.coins);
+        const coinMul = this.run.coinMul * this.run.pendingRewardMul * (this.run.pendingDoubleCoin ? 2 : 1);
+        const bonus = Math.round(QUIZ_BONUS_COINS * coinMul);
+        this.coins += bonus;
+        this.stageCoinDelta += bonus;
+        this.hud.setCoins(this.run.totalCoins + this.stageCoinDelta);
         this.disaster.resolve();
       }
       this.physics.world.resume();
@@ -305,7 +334,8 @@ export class GameScene extends Phaser.Scene {
 
   private onPointerDown(p: Phaser.Input.Pointer): void {
     if (this.quizActive) return;
-    if (this.gameOver || this.cleared) {
+    if (this.cleared) return;
+    if (this.gameOver) {
       this.restart();
       return;
     }
@@ -353,7 +383,18 @@ export class GameScene extends Phaser.Scene {
 
   private handleClear(): void {
     this.cleared = true;
-    this.showOverlay("✨ 스테이지 클리어", `획득 코인: ${this.coins}\n탭 또는 R: 재시작 / ESC: 메뉴`);
+    this.run.totalCoins += this.stageCoinDelta;
+    this.run.consumeOneShots();
+    this.showOverlay(
+      "✨ 스테이지 클리어",
+      `이번 스테이지 +${this.stageCoinDelta} 코인 (누적 ${this.run.totalCoins})\n탭 / Space — 카드 선택`,
+    );
+    const advance = () => this.scene.start("CardSelectScene", { run: this.run });
+    this.input.keyboard?.once("keydown-SPACE", advance);
+    this.input.keyboard?.once("keydown-ENTER", advance);
+    this.time.delayedCall(800, () => {
+      this.input.once(Phaser.Input.Events.POINTER_DOWN, advance);
+    });
   }
 
   private showOverlay(title: string, subtitle: string): void {
@@ -387,10 +428,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private restart(): void {
-    this.scene.restart();
+    if (this.gameOver) {
+      this.run.reset();
+    }
+    this.scene.start("GameScene", { run: this.run });
   }
 
   private returnToMenu(): void {
+    this.run.reset();
     this.scene.start("MainMenuScene");
   }
 }
