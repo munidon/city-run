@@ -4,6 +4,7 @@ import { Player } from "@/objects/Player";
 import { Obstacle } from "@/objects/Obstacle";
 import { Item } from "@/objects/Item";
 import { Scroll } from "@/objects/Scroll";
+import { ChaseShadow } from "@/objects/ChaseShadow";
 import { HealthSystem } from "@/systems/HealthSystem";
 import { StageSystem } from "@/systems/StageSystem";
 import { ObstacleSpawner } from "@/systems/ObstacleSpawner";
@@ -38,6 +39,7 @@ export class GameScene extends Phaser.Scene {
   private iframesUntil = 0;
   private quizActive = false;
   private quiz?: QuizModal;
+  private chase?: ChaseShadow;
 
   private touchStart?: { x: number; y: number; time: number };
 
@@ -81,13 +83,18 @@ export class GameScene extends Phaser.Scene {
     this.disaster.onTrigger(() => {
       this.hud.setDisasterStatus("⚠ 재난 가속 — 두루마리를 찾아라!");
       this.cameras.main.shake(400, 0.005);
+      this.chase?.destroy();
+      this.chase = new ChaseShadow(this);
     });
     this.disaster.onSpawnScroll(() => {
       if (this.gameOver || this.cleared) return;
       this.items.spawnScroll();
     });
     this.disaster.onResolve(() => {
-      this.hud.setDisasterStatus("");
+      this.hud.setDisasterStatus("✓ 재난 해소");
+      this.time.delayedCall(1500, () => this.hud.setDisasterStatus(""));
+      this.chase?.hide();
+      this.chase = undefined;
     });
 
     this.bindInput();
@@ -115,6 +122,16 @@ export class GameScene extends Phaser.Scene {
 
     this.obstacles.update(delta);
     this.items.update(delta);
+
+    if (this.chase) {
+      this.chase.setX(this.disaster.chasePosition);
+      this.chase.update(delta);
+      const playerLeftEdge = this.player.x - 28;
+      if (this.disaster.chasePosition >= playerLeftEdge && !this.disaster.hasResolved) {
+        this.handleChaseCaught();
+        return;
+      }
+    }
 
     this.player.update();
 
@@ -311,6 +328,15 @@ export class GameScene extends Phaser.Scene {
   private handleDeath(): void {
     this.gameOver = true;
     this.showOverlay("💀 사망", `획득 코인: ${this.coins}\n탭 또는 R: 재시작 / ESC: 메뉴`);
+  }
+
+  private handleChaseCaught(): void {
+    if (this.gameOver) return;
+    this.gameOver = true;
+    this.health.damage(999);
+    this.cameras.main.shake(600, 0.012);
+    this.cameras.main.flash(400, 255, 60, 30);
+    this.showOverlay("🔥 재난에 휩쓸림", `획득 코인: ${this.coins}\n탭 또는 R: 재시작 / ESC: 메뉴`);
   }
 
   private handleClear(): void {
