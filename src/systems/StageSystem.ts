@@ -1,20 +1,36 @@
 export type ProgressListener = (progress01: number) => void;
+export type CheckpointListener = (checkpoint: number) => void;
 
 const STAGE_DURATION_SEC = 60;
+const CHECKPOINTS = [0.5, 0.8];
 
 export class StageSystem {
   private elapsedMs = 0;
   private listeners: ProgressListener[] = [];
+  private checkpointListeners: CheckpointListener[] = [];
+  private firedCheckpoints = new Set<number>();
 
   public tick(deltaMs: number): void {
     if (this.complete) return;
     this.elapsedMs += deltaMs;
     const p = this.progress;
     for (const l of this.listeners) l(p);
+
+    for (const cp of CHECKPOINTS) {
+      if (!this.firedCheckpoints.has(cp) && p >= cp) {
+        this.firedCheckpoints.add(cp);
+        for (const l of this.checkpointListeners) l(cp);
+      }
+    }
+  }
+
+  public onCheckpoint(listener: CheckpointListener): void {
+    this.checkpointListeners.push(listener);
   }
 
   public reset(): void {
     this.elapsedMs = 0;
+    this.firedCheckpoints.clear();
     for (const l of this.listeners) l(0);
   }
 

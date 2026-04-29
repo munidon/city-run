@@ -77,6 +77,7 @@ export class GameScene extends Phaser.Scene {
     this.hud = new HUD(this);
     this.health.onChange((cur, max) => this.hud.setHealth(cur, max));
     this.stage.onChange((p) => this.hud.setProgress(p));
+    this.stage.onCheckpoint((cp) => this.handleCheckpoint(cp));
     this.hud.setStageLabel("Stage 1-1 (PoC)");
     this.hud.setCoins(0);
 
@@ -328,6 +329,17 @@ export class GameScene extends Phaser.Scene {
   private handleDeath(): void {
     this.gameOver = true;
     this.showOverlay("💀 사망", `획득 코인: ${this.coins}\n탭 또는 R: 재시작 / ESC: 메뉴`);
+  }
+
+  private handleCheckpoint(cp: number): void {
+    this.health.heal(10);
+    this.iframesUntil = this.time.now + 500;
+    const label = `🛟 체크포인트 ${Math.round(cp * 100)}%  +10 HP`;
+    this.hud.setDisasterStatus(label);
+    this.time.delayedCall(1200, () => {
+      if (this.disaster.isActive) return;
+      this.hud.setDisasterStatus("");
+    });
   }
 
   private handleChaseCaught(): void {

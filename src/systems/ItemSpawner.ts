@@ -8,8 +8,8 @@ interface IntervalRange {
   maxMs: number;
 }
 
-const ITEM_INTERVAL: IntervalRange = { minMs: 900, maxMs: 1500 };
-const ITEM_WEIGHTS: Record<ItemKind, number> = { bread: 6, lunchbox: 1, coin: 5 };
+const ITEM_INTERVAL: IntervalRange = { minMs: 1400, maxMs: 2200 };
+const ITEM_WEIGHTS: Record<ItemKind, number> = { bread: 6, lunchbox: 2, coin: 5 };
 
 const Y_LOW = GROUND_Y - 60;
 const Y_MID = GROUND_Y - 160;
