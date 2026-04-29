@@ -1,32 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx create-next-app@latest fire-safety-edu --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
-      "Bash(npm install:*)",
-      "mcp__Claude_Preview__preview_start",
-      "mcp__7f169411-1674-4110-9725-d174107486e4__list_organizations",
-      "mcp__7f169411-1674-4110-9725-d174107486e4__get_cost",
-      "mcp__7f169411-1674-4110-9725-d174107486e4__confirm_cost",
-      "mcp__7f169411-1674-4110-9725-d174107486e4__create_project",
-      "mcp__7f169411-1674-4110-9725-d174107486e4__get_project_url",
-      "mcp__7f169411-1674-4110-9725-d174107486e4__get_publishable_keys",
-      "mcp__7f169411-1674-4110-9725-d174107486e4__apply_migration",
-      "Bash(find /Users/hhj/DOAN/fire-safety-edu/src -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.json \\\\\\))",
-      "Bash(npx vercel:*)",
-      "mcp__c4ebfc9f-d801-47db-986d-75b6522542eb__deploy_to_vercel",
-      "Read(//Users/hhj/.local/share/com.vercel.cli/**)",
-      "Read(//Users/hhj/.config/com.vercel.cli/**)",
-      "Bash(VERCEL_ORG_ID=team_mMCftgwzK5kOnJCatlCNNlqq npx vercel deploy --prod --yes)",
-      "Bash(script -q /dev/null npx vercel link --scope munidons-projects --yes)",
-      "Bash(script -q /dev/null npx vercel env add NEXT_PUBLIC_SUPABASE_URL production)",
-      "Bash(printf 'https://oyovipqdjfprdauzchef.supabase.co')",
-      "Bash(script -q /dev/null npx vercel env add NEXT_PUBLIC_SUPABASE_URL production --force)",
-      "Bash(printf 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95b3ZpcHFkamZwcmRhdXpjaGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5OTk3NjcsImV4cCI6MjA5MDU3NTc2N30._rXgaRpPVFGafFdAy831hUvvfv_UMo3eUQfTCNydKnI')",
-      "Bash(script -q /dev/null npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production --force)",
-      "Bash(printf 'https://oyovipqdjfprdauzchef.supabase.co\\\\n')",
-      "Bash(printf 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95b3ZpcHFkamZwcmRhdXpjaGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5OTk3NjcsImV4cCI6MjA5MDU3NTc2N30._rXgaRpPVFGafFdAy831hUvvfv_UMo3eUQfTCNydKnI\\\\n')",
-      "Bash(script -q /dev/null npx vercel deploy --prod --yes)",
-      "Bash(gh auth:*)"
+      "Bash(npm --version)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(curl -s -o /dev/null -w \"main.ts: HTTP %{http_code}\\\\n\" http://localhost:5173/src/main.ts)",
+      "Bash(kill %1)",
+      "Bash(lsof -ti:5173)",
+      "Bash(xargs -r kill)"
     ]
   }
 }

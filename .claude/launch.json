@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Next.js Dev Server",
+      "name": "vite",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "fire-safety-edu"],
-      "port": 3000
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173
     }
   ]
 }

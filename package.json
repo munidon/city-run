@@ -1,0 +1,21 @@
+{
+  "name": "city-run",
+  "version": "0.1.0",
+  "description": "도시런 - 2D 사이드뷰 러닝 액션 + 라이트 로그라이크 + 퀴즈 게임",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host"
+  },
+  "author": "황현종",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "phaser": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10"
+  }
+}
