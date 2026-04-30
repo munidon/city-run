@@ -4,6 +4,9 @@ export const AssetKey = {
   PlayerSlide: "asset:player:slide",
   ObstacleSingleBox: "asset:obstacle:single_box",
   ObstacleDoublePillar: "asset:obstacle:double_pillar",
+  BackgroundBack: "asset:background:back",
+  BackgroundMid: "asset:background:mid",
+  Road: "asset:road",
   ItemBread: "asset:item:bread",
   ItemLunchbox: "asset:item:lunchbox",
   ItemCoin: "asset:item:coin",
@@ -16,6 +19,9 @@ export const AssetKey = {
 
 export const GAME_IMAGE_ASSETS: Array<{ key: string; path: string }> = [
   // Obstacles are generated dynamically by Obstacle.ts
+  { key: AssetKey.BackgroundBack, path: "assets/environment/bg_far.png" },
+  { key: AssetKey.BackgroundMid, path: "assets/environment/bg_mid.png" },
+  { key: AssetKey.Road, path: "assets/environment/road.png" },
   { key: AssetKey.ItemBread, path: "assets/items/bread.svg" },
   { key: AssetKey.ItemLunchbox, path: "assets/items/lunchbox.svg" },
   { key: AssetKey.ItemCoin, path: "assets/items/coin.svg" },

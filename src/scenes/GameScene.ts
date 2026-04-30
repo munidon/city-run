@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-
+import { AssetKey } from "@/assets";
 import { BASE_SPEED, GAME_HEIGHT, GAME_WIDTH, GROUND_HEIGHT, GROUND_Y, PLAYER_X } from "@/config";
 import { Player } from "@/objects/Player";
 import { Obstacle } from "@/objects/Obstacle";
@@ -43,6 +43,9 @@ export class GameScene extends Phaser.Scene {
   private chase?: ChaseShadow;
   private run!: RunState;
   private stageCoinDelta = 0;
+
+  // 배경 이미지 전체를 위아래로 조절하여 캐릭터의 발(GROUND_Y)에 맞추기 위한 변수 (양수: 위로 이동, 음수: 아래로 이동)
+  private readonly bgOffsetY = 0;
 
   constructor() {
     super("GameScene");
@@ -136,9 +139,9 @@ export class GameScene extends Phaser.Scene {
     this.disaster.tick(delta, this.stage.progress);
 
     const speed = this.currentSpeed();
-    this.bgFar.tilePositionX += (speed * 0.2 * delta) / 1000;
-    this.bgNear.tilePositionX += (speed * 0.5 * delta) / 1000;
-    this.ground.tilePositionX += (speed * delta) / 1000;
+    this.bgFar.tilePositionX += (speed * 0.2 * delta) / 1000 / this.bgFar.tileScaleX;
+    this.bgNear.tilePositionX += (speed * 0.5 * delta) / 1000 / this.bgNear.tileScaleX;
+    this.ground.tilePositionX += (speed * delta) / 1000 / this.ground.tileScaleX;
 
     this.obstacles.update(delta);
     this.items.update(delta);
@@ -257,31 +260,66 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground(): void {
-    const farKey = this.makeStripeTexture("__bg_far", 0x14182b, 0x1c2240, 64);
-    const nearKey = this.makeStripeTexture("__bg_near", 0x232a4a, 0x2d3560, 96);
+    const farKey = this.textures.exists(AssetKey.BackgroundBack)
+      ? AssetKey.BackgroundBack
+      : this.makeStripeTexture("__bg_far", 0x14182b, 0x1c2240, 64);
+    const nearKey = this.textures.exists(AssetKey.BackgroundMid)
+      ? AssetKey.BackgroundMid
+      : this.makeStripeTexture("__bg_near", 0x232a4a, 0x2d3560, 96);
 
     this.bgFar = this.add
       .tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, farKey)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(0);
+    const farScale = GAME_HEIGHT / this.textureHeight(farKey, GAME_HEIGHT);
+    this.bgFar.tileScaleX = farScale;
+    this.bgFar.tileScaleY = farScale;
+    this.bgFar.tilePositionY = this.bgOffsetY;
 
     this.bgNear = this.add
-      .tileSprite(0, GROUND_Y - 96, GAME_WIDTH, 96, nearKey)
+      .tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, nearKey)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(1);
+    const nearScale = GAME_HEIGHT / this.textureHeight(nearKey, GAME_HEIGHT);
+    this.bgNear.tileScaleX = nearScale;
+    this.bgNear.tileScaleY = nearScale;
+    const bgNearOffsetY = this.bgOffsetY - 20;
+    this.bgNear.tilePositionY = bgNearOffsetY;
   }
 
   private createGround(): void {
-    const groundTex = this.makeStripeTexture("__ground", 0x2e2a1f, 0x3c3826, 64);
+    const groundTex = this.textures.exists(AssetKey.Road)
+      ? AssetKey.Road
+      : this.makeStripeTexture("__ground", 0x2e2a1f, 0x3c3826, 64);
+    const roadSizeMultiplier = 0.8;
+    const groundScale = (GAME_HEIGHT / this.textureHeight(groundTex, GAME_HEIGHT)) * roadSizeMultiplier;
+
+    // 스케일이 적용된 실제 이미지의 세로 높이입니다.
+    // 타일 스프라이트의 높이를 이 값과 똑같이 맞춰야 이미지가 위아래로 반복(타일링)되지 않습니다.
+    const scaledTexHeight = this.textureHeight(groundTex, GAME_HEIGHT) * groundScale;
+
+    // 💡 도로의 상하 위치를 조절하는 값입니다. (양수면 아래로, 음수면 위로 이동)
+    // 도로가 너무 위에 떠 있다면 이 값을 늘려보세요 (예: 150, 200 등)
+    const roadOffsetY = 150;
+    const startY = GAME_HEIGHT - scaledTexHeight + roadOffsetY;
+
     this.ground = this.add
-      .tileSprite(0, GROUND_Y, GAME_WIDTH, GROUND_HEIGHT, groundTex)
+      .tileSprite(0, startY, GAME_WIDTH, scaledTexHeight, groundTex)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(2);
 
+    this.ground.tileScaleX = groundScale;
+    this.ground.tileScaleY = groundScale;
+
     this.groundBody = this.physics.add.staticBody(0, GROUND_Y, GAME_WIDTH, GROUND_HEIGHT);
+  }
+
+  private textureHeight(key: string, fallback: number): number {
+    const image = this.textures.get(key).getSourceImage() as { height?: number } | null;
+    return image?.height && image.height > 0 ? image.height : fallback;
   }
 
   private makeStripeTexture(key: string, c1: number, c2: number, size: number): string {
@@ -398,7 +436,7 @@ export class GameScene extends Phaser.Scene {
 
     this.add
       .text(cx, cy - 40, title, {
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: "'Ramche', system-ui, sans-serif",
         fontSize: "64px",
         color: "#ffffff",
         fontStyle: "bold",
@@ -409,7 +447,7 @@ export class GameScene extends Phaser.Scene {
 
     this.add
       .text(cx, cy + 50, subtitle, {
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: "'Ramche', system-ui, sans-serif",
         fontSize: "22px",
         color: "#cccccc",
         align: "center",

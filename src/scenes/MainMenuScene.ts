@@ -14,14 +14,14 @@ export class MainMenuScene extends Phaser.Scene {
     const cy = GAME_HEIGHT / 2;
 
     this.add
-      .image(cx, cy, AssetKey.TitleLogo)
+      .image(cx, cy - 70, AssetKey.TitleLogo)
       .setOrigin(0.5)
       .setDisplaySize(1360, 750);
 
     makeButton(
       this,
       cx,
-      cy + 80,
+      cy + 170,
       "▶  게임 시작",
       () => this.scene.start("GameScene", { run: new RunState() }),
       {
@@ -36,14 +36,14 @@ export class MainMenuScene extends Phaser.Scene {
     makeButton(
       this,
       cx,
-      cy + 168,
+      cy + 250,
       "⚙  설정",
       () => this.scene.start("SettingsScene"),
       {
         width: 300,
         height: 52,
         bgColor: 0x1e1e38,
-        fontSize: "22px",
+        fontSize: "28px",
         textColor: "#8888bb",
       }
     );
