@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { GAME_WIDTH } from "@/config";
+import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 
 const FONT = "system-ui, -apple-system, sans-serif";
 
@@ -117,12 +117,13 @@ export class HUD {
     this.healthBar.fillStyle(hpColor, 1);
     this.healthBar.fillRoundedRect(padX + 2, topBarY + 2, (topBarW - 4) * this.healthRatio, topBarH - 4, 6);
 
-    const botBarY = 720 - 60;
-    const botBarH = 18;
+    const botBarW = 380;
+    const botBarH = 10;
+    const botBarY = GAME_HEIGHT - 40;
     this.progressBar.clear();
     this.progressBar.fillStyle(0x000000, 0.45);
-    this.progressBar.fillRoundedRect(padX, botBarY, topBarW, botBarH, 6);
+    this.progressBar.fillRoundedRect(padX, botBarY, botBarW, botBarH, 5);
     this.progressBar.fillStyle(0x4dabff, 1);
-    this.progressBar.fillRoundedRect(padX + 2, botBarY + 2, (topBarW - 4) * this.progressRatio, botBarH - 4, 4);
+    this.progressBar.fillRoundedRect(padX + 2, botBarY + 2, (botBarW - 4) * this.progressRatio, botBarH - 4, 3);
   }
 }

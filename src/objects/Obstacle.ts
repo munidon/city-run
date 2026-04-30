@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { AssetKey } from "@/assets";
 import { GROUND_Y } from "@/config";
 
 export type ObstacleKind = "flame" | "falling" | "low_bar";
@@ -47,6 +48,12 @@ const SPECS: Record<ObstacleKind, ObstacleSpec> = {
   },
 };
 
+const ASSET_KEYS: Record<ObstacleKind, string> = {
+  flame: AssetKey.ObstacleFlame,
+  falling: AssetKey.ObstacleFalling,
+  low_bar: AssetKey.ObstacleLowBar,
+};
+
 export class Obstacle extends Phaser.Physics.Arcade.Sprite {
   public readonly kind: ObstacleKind;
   public readonly damagePct: number;
@@ -67,10 +74,13 @@ export class Obstacle extends Phaser.Physics.Arcade.Sprite {
     body.setSize(spec.width, spec.height);
     body.setAllowGravity(spec.gravity);
     body.setImmovable(!spec.gravity);
-    this.setDepth(50);
+    this.setDepth(80);
   }
 
   private static ensureTexture(scene: Phaser.Scene, kind: ObstacleKind, spec: ObstacleSpec): string {
+    const assetKey = ASSET_KEYS[kind];
+    if (scene.textures.exists(assetKey)) return assetKey;
+
     const key = `__obs_${kind}`;
     if (scene.textures.exists(key)) return key;
     const g = scene.add.graphics({ x: 0, y: 0 });

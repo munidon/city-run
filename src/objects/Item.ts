@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { AssetKey } from "@/assets";
 
 export type ItemKind = "bread" | "lunchbox" | "coin";
 
@@ -15,6 +16,12 @@ const SPECS: Record<ItemKind, ItemSpec> = {
   bread: { size: 38, healPct: 5, coins: 0, color: 0xf5c98a, accent: 0xb47b3b, label: "B" },
   lunchbox: { size: 48, healPct: 15, coins: 0, color: 0xff7a59, accent: 0xffffff, label: "L" },
   coin: { size: 32, healPct: 0, coins: 1, color: 0xffd73d, accent: 0xb38600, label: "$" },
+};
+
+const ASSET_KEYS: Record<ItemKind, string> = {
+  bread: AssetKey.ItemBread,
+  lunchbox: AssetKey.ItemLunchbox,
+  coin: AssetKey.ItemCoin,
 };
 
 export class Item extends Phaser.Physics.Arcade.Sprite {
@@ -39,11 +46,11 @@ export class Item extends Phaser.Physics.Arcade.Sprite {
     body.setSize(spec.size, spec.size);
     body.setAllowGravity(false);
     body.setImmovable(true);
-    this.setDepth(40);
+    this.setDepth(75);
 
     scene.tweens.add({
       targets: this,
-      y: y - 6,
+      scale: 1.08,
       duration: 700,
       yoyo: true,
       repeat: -1,
@@ -52,6 +59,9 @@ export class Item extends Phaser.Physics.Arcade.Sprite {
   }
 
   private static ensureTexture(scene: Phaser.Scene, kind: ItemKind, spec: ItemSpec): string {
+    const assetKey = ASSET_KEYS[kind];
+    if (scene.textures.exists(assetKey)) return assetKey;
+
     const key = `__item_${kind}`;
     if (scene.textures.exists(key)) return key;
     const g = scene.add.graphics({ x: 0, y: 0 });

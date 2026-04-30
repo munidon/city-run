@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { AssetKey } from "@/assets";
 import { BASE_SPEED, GAME_HEIGHT, GAME_WIDTH, GROUND_HEIGHT, GROUND_Y, PLAYER_X } from "@/config";
 import { Player } from "@/objects/Player";
 import { Obstacle } from "@/objects/Obstacle";
@@ -15,7 +16,6 @@ import { QuizModal } from "@/ui/QuizModal";
 import { pickRandomQuiz } from "@/data/quizzes";
 import { RunState } from "@/state/RunState";
 
-const SWIPE_THRESHOLD_PX = 40;
 const COLLISION_IFRAMES_MS = 700;
 const QUIZ_BONUS_COINS = 50;
 
@@ -43,8 +43,6 @@ export class GameScene extends Phaser.Scene {
   private chase?: ChaseShadow;
   private run!: RunState;
   private stageCoinDelta = 0;
-
-  private touchStart?: { x: number; y: number; time: number };
 
   constructor() {
     super("GameScene");
@@ -118,6 +116,8 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.bindInput();
+
+    this.createMobileUI();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.teardownInput();
@@ -256,31 +256,45 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground(): void {
-    const farKey = this.makeStripeTexture("__bg_far", 0x14182b, 0x1c2240, 64);
-    const nearKey = this.makeStripeTexture("__bg_near", 0x232a4a, 0x2d3560, 96);
+    const farKey = this.textures.exists(AssetKey.BackgroundBack)
+      ? AssetKey.BackgroundBack
+      : this.makeStripeTexture("__bg_far", 0x14182b, 0x1c2240, 64);
+    const nearKey = this.textures.exists(AssetKey.BackgroundMid)
+      ? AssetKey.BackgroundMid
+      : this.makeStripeTexture("__bg_near", 0x232a4a, 0x2d3560, 96);
 
     this.bgFar = this.add
       .tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, farKey)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(0);
+
+    const midHeight = Math.min(GROUND_Y, this.textureHeight(nearKey, GROUND_Y));
     this.bgNear = this.add
-      .tileSprite(0, GAME_HEIGHT * 0.4, GAME_WIDTH, GAME_HEIGHT * 0.6, nearKey)
+      .tileSprite(0, GROUND_Y - midHeight, GAME_WIDTH, midHeight, nearKey)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(1)
-      .setAlpha(0.85);
+      .setAlpha(1);
   }
 
   private createGround(): void {
-    const groundTex = this.makeStripeTexture("__ground", 0x2e2a1f, 0x3c3826, 64);
+    const groundTex = this.textures.exists(AssetKey.Road)
+      ? AssetKey.Road
+      : this.makeStripeTexture("__ground", 0x2e2a1f, 0x3c3826, 64);
     this.ground = this.add
       .tileSprite(0, GROUND_Y, GAME_WIDTH, GROUND_HEIGHT, groundTex)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(2);
+    this.ground.tileScaleY = GROUND_HEIGHT / this.textureHeight(groundTex, GROUND_HEIGHT);
 
     this.groundBody = this.physics.add.staticBody(0, GROUND_Y, GAME_WIDTH, GROUND_HEIGHT);
+  }
+
+  private textureHeight(key: string, fallback: number): number {
+    const image = this.textures.get(key).getSourceImage() as { height?: number } | null;
+    return image?.height && image.height > 0 ? image.height : fallback;
   }
 
   private makeStripeTexture(key: string, c1: number, c2: number, size: number): string {
@@ -302,11 +316,11 @@ export class GameScene extends Phaser.Scene {
     kb?.on("keydown-W", this.tryJump, this);
     kb?.on("keydown-DOWN", this.trySlide, this);
     kb?.on("keydown-S", this.trySlide, this);
+    kb?.on("keyup-DOWN", this.tryEndSlide, this);
+    kb?.on("keyup-S", this.tryEndSlide, this);
     kb?.on("keydown-ESC", this.returnToMenu, this);
     kb?.on("keydown-R", this.restart, this);
-
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
-    this.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
   }
 
   private teardownInput(): void {
@@ -316,10 +330,11 @@ export class GameScene extends Phaser.Scene {
     kb?.off("keydown-W", this.tryJump, this);
     kb?.off("keydown-DOWN", this.trySlide, this);
     kb?.off("keydown-S", this.trySlide, this);
+    kb?.off("keyup-DOWN", this.tryEndSlide, this);
+    kb?.off("keyup-S", this.tryEndSlide, this);
     kb?.off("keydown-ESC", this.returnToMenu, this);
     kb?.off("keydown-R", this.restart, this);
     this.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
-    this.input.off(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
   }
 
   private tryJump(): void {
@@ -332,6 +347,11 @@ export class GameScene extends Phaser.Scene {
     this.player.slide();
   }
 
+  private tryEndSlide(): void {
+    if (this.gameOver || this.cleared || this.quizActive) return;
+    this.player.endSlide();
+  }
+
   private onPointerDown(p: Phaser.Input.Pointer): void {
     if (this.quizActive) return;
     if (this.cleared) return;
@@ -339,21 +359,6 @@ export class GameScene extends Phaser.Scene {
       this.restart();
       return;
     }
-    this.touchStart = { x: p.x, y: p.y, time: p.downTime };
-  }
-
-  private onPointerUp(p: Phaser.Input.Pointer): void {
-    if (this.quizActive) return;
-    if (!this.touchStart) return;
-    const dx = p.x - this.touchStart.x;
-    const dy = p.y - this.touchStart.y;
-    this.touchStart = undefined;
-
-    if (dy > SWIPE_THRESHOLD_PX && Math.abs(dy) > Math.abs(dx)) {
-      this.trySlide();
-      return;
-    }
-    this.tryJump();
   }
 
   private handleDeath(): void {
@@ -437,5 +442,54 @@ export class GameScene extends Phaser.Scene {
   private returnToMenu(): void {
     this.run.reset();
     this.scene.start("MainMenuScene");
+  }
+  private createMobileUI(): void {
+    // 데스크탑 환경이면 버튼을 만들지 않음
+    if (this.sys.game.device.os.desktop) return;
+
+    // 양쪽 버튼 동시 터치를 위한 멀티 터치 활성화
+    this.input.addPointer(1);
+
+    // --- 왼쪽 JUMP 버튼 ---
+    const jumpX = GAME_WIDTH * 0.15;
+    const jumpY = GAME_HEIGHT * 0.85;
+    const jumpBtn = this.add.circle(jumpX, jumpY, 70, 0xffffff, 0.3)
+      .setScrollFactor(0)
+      .setDepth(2000)
+      .setInteractive();
+
+    this.add.text(jumpX, jumpY, "JUMP", { fontSize: "24px", color: "#ffffff", fontStyle: "bold" })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(2001);
+
+    jumpBtn.on('pointerdown', () => {
+      jumpBtn.setAlpha(0.6);
+      this.tryJump();
+    });
+    jumpBtn.on('pointerup', () => jumpBtn.setAlpha(0.3));
+    jumpBtn.on('pointerout', () => jumpBtn.setAlpha(0.3));
+
+    // --- 오른쪽 SLIDE 버튼 ---
+    const slideX = GAME_WIDTH * 0.85;
+    const slideY = GAME_HEIGHT * 0.85;
+    const slideBtn = this.add.circle(slideX, slideY, 70, 0xffffff, 0.3)
+      .setScrollFactor(0)
+      .setDepth(2000)
+      .setInteractive();
+
+    this.add.text(slideX, slideY, "SLIDE", { fontSize: "24px", color: "#ffffff", fontStyle: "bold" })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(2001);
+
+    slideBtn.on('pointerdown', () => {
+      slideBtn.setAlpha(0.6);
+      this.trySlide();
+    });
+    slideBtn.on('pointerup', () => {
+      slideBtn.setAlpha(0.3);
+      this.tryEndSlide();
+    });
+    slideBtn.on('pointerout', () => {
+      slideBtn.setAlpha(0.3);
+      this.tryEndSlide();
+    });
   }
 }

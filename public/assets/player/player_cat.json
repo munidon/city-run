@@ -1,0 +1,30 @@
+{
+  "frames": [
+    { "filename": "sprite4", "frame": { "x": 33, "y": 82, "w": 192, "h": 100 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 192, "h": 100 }, "sourceSize": { "w": 192, "h": 100 } },
+    { "filename": "sprite5", "frame": { "x": 256, "y": 82, "w": 192, "h": 100 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 192, "h": 100 }, "sourceSize": { "w": 192, "h": 100 } },
+    { "filename": "sprite1", "frame": { "x": 477, "y": 79, "w": 197, "h": 105 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 197, "h": 105 }, "sourceSize": { "w": 197, "h": 105 } },
+    { "filename": "sprite2", "frame": { "x": 702, "y": 80, "w": 194, "h": 104 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 194, "h": 104 }, "sourceSize": { "w": 194, "h": 104 } },
+    { "filename": "sprite3", "frame": { "x": 929, "y": 81, "w": 192, "h": 102 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 192, "h": 102 }, "sourceSize": { "w": 192, "h": 102 } },
+    { "filename": "sprite6", "frame": { "x": 1152, "y": 82, "w": 190, "h": 102 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 190, "h": 102 }, "sourceSize": { "w": 190, "h": 102 } },
+    { "filename": "sprite18", "frame": { "x": 43, "y": 378, "w": 173, "h": 110 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 173, "h": 110 }, "sourceSize": { "w": 173, "h": 110 } },
+    { "filename": "sprite16", "frame": { "x": 271, "y": 328, "w": 157, "h": 159 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 157, "h": 159 }, "sourceSize": { "w": 157, "h": 159 } },
+    { "filename": "sprite15", "frame": { "x": 512, "y": 280, "w": 136, "h": 167 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 136, "h": 167 }, "sourceSize": { "w": 136, "h": 167 } },
+    { "filename": "sprite14", "frame": { "x": 709, "y": 275, "w": 173, "h": 141 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 173, "h": 141 }, "sourceSize": { "w": 173, "h": 141 } },
+    { "filename": "sprite17", "frame": { "x": 927, "y": 342, "w": 187, "h": 120 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 187, "h": 120 }, "sourceSize": { "w": 187, "h": 120 } },
+    { "filename": "sprite19", "frame": { "x": 1154, "y": 385, "w": 180, "h": 103 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 180, "h": 103 }, "sourceSize": { "w": 180, "h": 103 } },
+    { "filename": "sprite23", "frame": { "x": 33, "y": 649, "w": 194, "h": 73 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 194, "h": 73 }, "sourceSize": { "w": 194, "h": 73 } },
+    { "filename": "sprite22", "frame": { "x": 256, "y": 648, "w": 193, "h": 74 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 193, "h": 74 }, "sourceSize": { "w": 193, "h": 74 } },
+    { "filename": "sprite25", "frame": { "x": 480, "y": 650, "w": 193, "h": 72 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 193, "h": 72 }, "sourceSize": { "w": 193, "h": 72 } },
+    { "filename": "sprite24", "frame": { "x": 703, "y": 649, "w": 194, "h": 73 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 194, "h": 73 }, "sourceSize": { "w": 194, "h": 73 } },
+    { "filename": "sprite21", "frame": { "x": 926, "y": 646, "w": 192, "h": 76 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 192, "h": 76 }, "sourceSize": { "w": 192, "h": 76 } },
+    { "filename": "sprite20", "frame": { "x": 1149, "y": 639, "w": 190, "h": 83 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 190, "h": 83 }, "sourceSize": { "w": 190, "h": 83 } }
+  ],
+  "meta": {
+    "app": "codex",
+    "version": "1.0",
+    "image": "player_cat.png",
+    "format": "RGBA8888",
+    "size": { "w": 1376, "h": 768 },
+    "scale": "1"
+  }
+}

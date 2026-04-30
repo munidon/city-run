@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { AssetKey } from "@/assets";
 
 const W = 56;
 const H = 64;
@@ -17,21 +18,13 @@ export class Scroll extends Phaser.Physics.Arcade.Sprite {
     body.setSize(W, H);
     body.setAllowGravity(false);
     body.setImmovable(true);
-    this.setDepth(45);
+    this.setDepth(76);
 
     scene.tweens.add({
       targets: this,
       angle: 6,
-      duration: 500,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-    });
-
-    scene.tweens.add({
-      targets: this,
-      y: y - 10,
-      duration: 800,
+      scale: 1.06,
+      duration: 650,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
@@ -39,6 +32,8 @@ export class Scroll extends Phaser.Physics.Arcade.Sprite {
   }
 
   private static ensureTexture(scene: Phaser.Scene): string {
+    if (scene.textures.exists(AssetKey.Scroll)) return AssetKey.Scroll;
+
     const key = "__scroll";
     if (scene.textures.exists(key)) return key;
     const g = scene.add.graphics({ x: 0, y: 0 });
