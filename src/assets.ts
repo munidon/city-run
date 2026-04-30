@@ -11,9 +11,7 @@ export const AssetKey = {
   ItemLunchbox: "asset:item:lunchbox",
   ItemCoin: "asset:item:coin",
   Scroll: "asset:scroll",
-  BackgroundBack: "asset:background:back",
-  BackgroundMid: "asset:background:mid",
-  Road: "asset:road",
+
   TitleLogo: "asset:ui:title-logo",
 } as const;
 
@@ -26,9 +24,7 @@ export const GAME_IMAGE_ASSETS: Array<{ key: string; path: string }> = [
   { key: AssetKey.ItemLunchbox, path: "assets/items/lunchbox.svg" },
   { key: AssetKey.ItemCoin, path: "assets/items/coin.svg" },
   { key: AssetKey.Scroll, path: "assets/items/scroll.svg" },
-  { key: AssetKey.BackgroundBack, path: "assets/environment/back-background.png" },
-  { key: AssetKey.BackgroundMid, path: "assets/environment/mid-background.png" },
-  { key: AssetKey.Road, path: "assets/environment/road.png" },
+
   { key: AssetKey.TitleLogo, path: "assets/ui/title-logo.png" },
 ];
 
