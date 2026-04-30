@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { AssetKey } from "@/assets";
 import { GROUND_Y } from "@/config";
 
-export type ObstacleKind = "flame" | "falling" | "low_bar";
+export type ObstacleKind = "single_box" | "double_pillar";
 
 interface ObstacleSpec {
   width: number;
@@ -16,42 +16,31 @@ interface ObstacleSpec {
 }
 
 const SPECS: Record<ObstacleKind, ObstacleSpec> = {
-  flame: {
-    width: 56,
-    height: 84,
+  single_box: {
+    width: 60,
+    height: 70,
     damagePct: 10,
-    color: 0xff5a2a,
-    accent: 0xffe066,
-    spawnY: GROUND_Y - 42,
+    color: 0x8b5a2b,
+    accent: 0xa0522d,
+    spawnY: GROUND_Y - 35,
     gravity: false,
-    label: "🔥",
+    label: "📦",
   },
-  falling: {
-    width: 64,
-    height: 64,
+  double_pillar: {
+    width: 50,
+    height: 155,
     damagePct: 15,
-    color: 0x8c715a,
-    accent: 0x4a3a2a,
-    spawnY: -40,
-    gravity: true,
-    label: "▣",
-  },
-  low_bar: {
-    width: 110,
-    height: 30,
-    damagePct: 8,
-    color: 0x7a8190,
-    accent: 0xfdd835,
-    spawnY: GROUND_Y - 110,
+    color: 0x708090,
+    accent: 0xa9a9a9,
+    spawnY: GROUND_Y - 77.5,
     gravity: false,
-    label: "═",
+    label: "🏛",
   },
 };
 
 const ASSET_KEYS: Record<ObstacleKind, string> = {
-  flame: AssetKey.ObstacleFlame,
-  falling: AssetKey.ObstacleFalling,
-  low_bar: AssetKey.ObstacleLowBar,
+  single_box: AssetKey.ObstacleSingleBox,
+  double_pillar: AssetKey.ObstacleDoublePillar,
 };
 
 export class Obstacle extends Phaser.Physics.Arcade.Sprite {
@@ -87,24 +76,19 @@ export class Obstacle extends Phaser.Physics.Arcade.Sprite {
     g.fillStyle(spec.color, 1);
     g.fillRoundedRect(0, 0, spec.width, spec.height, 8);
 
-    if (kind === "flame") {
+    if (kind === "single_box") {
       g.fillStyle(spec.accent ?? 0xffffff, 1);
-      g.fillRoundedRect(spec.width * 0.2, spec.height * 0.18, spec.width * 0.6, spec.height * 0.45, 8);
-      g.fillStyle(0xffffff, 0.9);
-      g.fillCircle(spec.width * 0.5, spec.height * 0.32, 6);
-    } else if (kind === "low_bar") {
+      g.fillRoundedRect(4, 4, spec.width - 8, spec.height - 8, 4);
+      g.fillStyle(0x000000, 0.2);
+      g.fillRect(spec.width * 0.1, spec.height * 0.45, spec.width * 0.8, 4);
+      g.fillRect(spec.width * 0.45, spec.height * 0.1, 4, spec.height * 0.8);
+    } else if (kind === "double_pillar") {
       g.fillStyle(spec.accent ?? 0xffffff, 1);
-      const stripeW = 18;
-      for (let i = 0; i < spec.width; i += stripeW * 2) {
-        g.fillRect(i, 0, stripeW, spec.height);
+      g.fillRect(5, 0, spec.width - 10, spec.height);
+      g.fillStyle(0x000000, 0.2);
+      for (let y = 10; y < spec.height; y += 20) {
+        g.fillRect(0, y, spec.width, 4);
       }
-      g.fillStyle(spec.color, 1);
-      g.fillRect(0, 0, spec.width, 4);
-      g.fillRect(0, spec.height - 4, spec.width, 4);
-    } else {
-      g.fillStyle(spec.accent ?? 0x000000, 0.4);
-      g.fillRect(spec.width * 0.15, spec.height * 0.55, spec.width * 0.7, 6);
-      g.fillRect(spec.width * 0.25, spec.height * 0.25, spec.width * 0.5, 6);
     }
 
     g.generateTexture(key, spec.width, spec.height);

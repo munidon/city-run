@@ -1,9 +1,8 @@
 import * as Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
+import { AssetKey } from "@/assets";
 import { RunState } from "@/state/RunState";
 import { makeButton } from "@/ui/button";
-
-const FONT = "'Ramche', system-ui, sans-serif";
 
 export class MainMenuScene extends Phaser.Scene {
   constructor() {
@@ -15,21 +14,9 @@ export class MainMenuScene extends Phaser.Scene {
     const cy = GAME_HEIGHT / 2;
 
     this.add
-      .text(cx, cy - 110, "도시런", {
-        fontFamily: FONT,
-        fontSize: "96px",
-        color: "#ffffff",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(cx, cy - 20, "City Run — PoC", {
-        fontFamily: FONT,
-        fontSize: "28px",
-        color: "#ffb84d",
-      })
-      .setOrigin(0.5);
+      .image(cx, cy, AssetKey.TitleLogo)
+      .setOrigin(0.5)
+      .setDisplaySize(1360, 750);
 
     makeButton(
       this,

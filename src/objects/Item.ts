@@ -13,8 +13,8 @@ interface ItemSpec {
 }
 
 const SPECS: Record<ItemKind, ItemSpec> = {
-  bread: { size: 38, healPct: 5, coins: 0, color: 0xf5c98a, accent: 0xb47b3b, label: "B" },
-  lunchbox: { size: 48, healPct: 15, coins: 0, color: 0xff7a59, accent: 0xffffff, label: "L" },
+  bread: { size: 38, healPct: 2, coins: 0, color: 0xf5c98a, accent: 0xb47b3b, label: "B" },
+  lunchbox: { size: 48, healPct: 5, coins: 0, color: 0xff7a59, accent: 0xffffff, label: "L" },
   coin: { size: 32, healPct: 0, coins: 1, color: 0xffd73d, accent: 0xb38600, label: "$" },
 };
 

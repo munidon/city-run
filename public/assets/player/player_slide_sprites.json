@@ -1,0 +1,52 @@
+{
+  "frames": [
+    {
+      "filename": "slide1",
+      "frame": { "x": 103, "y": 79, "w": 293, "h": 274 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 293, "h": 274 },
+      "sourceSize": { "w": 293, "h": 274 }
+    },
+    {
+      "filename": "slide2",
+      "frame": { "x": 473, "y": 108, "w": 404, "h": 244 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 404, "h": 244 },
+      "sourceSize": { "w": 404, "h": 244 }
+    },
+    {
+      "filename": "slide3",
+      "frame": { "x": 966, "y": 108, "w": 363, "h": 244 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 363, "h": 244 },
+      "sourceSize": { "w": 363, "h": 244 }
+    },
+    {
+      "filename": "slide14",
+      "frame": { "x": 269, "y": 431, "w": 467, "h": 286 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 467, "h": 286 },
+      "sourceSize": { "w": 467, "h": 286 }
+    },
+    {
+      "filename": "slide15",
+      "frame": { "x": 843, "y": 443, "w": 316, "h": 273 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 316, "h": 273 },
+      "sourceSize": { "w": 316, "h": 273 }
+    }
+  ],
+  "meta": {
+    "app": "codex",
+    "version": "1.0",
+    "image": "player_slide_sprites.png",
+    "format": "RGBA8888",
+    "size": { "w": 1408, "h": 768 },
+    "scale": "1"
+  }
+}

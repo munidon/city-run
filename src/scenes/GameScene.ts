@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { AssetKey } from "@/assets";
+
 import { BASE_SPEED, GAME_HEIGHT, GAME_WIDTH, GROUND_HEIGHT, GROUND_Y, PLAYER_X } from "@/config";
 import { Player } from "@/objects/Player";
 import { Obstacle } from "@/objects/Obstacle";
@@ -172,6 +172,7 @@ export class GameScene extends Phaser.Scene {
     obs.consumed = true;
     this.iframesUntil = this.time.now + COLLISION_IFRAMES_MS;
     this.health.damage(obs.damagePct);
+    this.player.playHit();
     this.flashHit();
     this.cameras.main.shake(120, 0.006);
 
@@ -256,12 +257,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground(): void {
-    const farKey = this.textures.exists(AssetKey.BackgroundBack)
-      ? AssetKey.BackgroundBack
-      : this.makeStripeTexture("__bg_far", 0x14182b, 0x1c2240, 64);
-    const nearKey = this.textures.exists(AssetKey.BackgroundMid)
-      ? AssetKey.BackgroundMid
-      : this.makeStripeTexture("__bg_near", 0x232a4a, 0x2d3560, 96);
+    const farKey = this.makeStripeTexture("__bg_far", 0x14182b, 0x1c2240, 64);
+    const nearKey = this.makeStripeTexture("__bg_near", 0x232a4a, 0x2d3560, 96);
 
     this.bgFar = this.add
       .tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, farKey)
@@ -269,32 +266,22 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(0);
 
-    const midHeight = Math.min(GROUND_Y, this.textureHeight(nearKey, GROUND_Y));
     this.bgNear = this.add
-      .tileSprite(0, GROUND_Y - midHeight, GAME_WIDTH, midHeight, nearKey)
+      .tileSprite(0, GROUND_Y - 96, GAME_WIDTH, 96, nearKey)
       .setOrigin(0, 0)
       .setScrollFactor(0)
-      .setDepth(1)
-      .setAlpha(1);
+      .setDepth(1);
   }
 
   private createGround(): void {
-    const groundTex = this.textures.exists(AssetKey.Road)
-      ? AssetKey.Road
-      : this.makeStripeTexture("__ground", 0x2e2a1f, 0x3c3826, 64);
+    const groundTex = this.makeStripeTexture("__ground", 0x2e2a1f, 0x3c3826, 64);
     this.ground = this.add
       .tileSprite(0, GROUND_Y, GAME_WIDTH, GROUND_HEIGHT, groundTex)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(2);
-    this.ground.tileScaleY = GROUND_HEIGHT / this.textureHeight(groundTex, GROUND_HEIGHT);
 
     this.groundBody = this.physics.add.staticBody(0, GROUND_Y, GAME_WIDTH, GROUND_HEIGHT);
-  }
-
-  private textureHeight(key: string, fallback: number): number {
-    const image = this.textures.get(key).getSourceImage() as { height?: number } | null;
-    return image?.height && image.height > 0 ? image.height : fallback;
   }
 
   private makeStripeTexture(key: string, c1: number, c2: number, size: number): string {
@@ -352,7 +339,7 @@ export class GameScene extends Phaser.Scene {
     this.player.endSlide();
   }
 
-  private onPointerDown(p: Phaser.Input.Pointer): void {
+  private onPointerDown(_p: Phaser.Input.Pointer): void {
     if (this.quizActive) return;
     if (this.cleared) return;
     if (this.gameOver) {

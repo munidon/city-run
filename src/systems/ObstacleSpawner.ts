@@ -14,10 +14,10 @@ interface PhaseConfig {
 }
 
 const PHASES: PhaseConfig[] = [
-  { threshold: 0.25, interval: { minMs: 1700, maxMs: 2400 }, weights: { flame: 6, falling: 1, low_bar: 2 } },
-  { threshold: 0.6, interval: { minMs: 1300, maxMs: 1900 }, weights: { flame: 5, falling: 2, low_bar: 3 } },
-  { threshold: 0.85, interval: { minMs: 1050, maxMs: 1500 }, weights: { flame: 4, falling: 3, low_bar: 3 } },
-  { threshold: 1.01, interval: { minMs: 900, maxMs: 1250 }, weights: { flame: 4, falling: 4, low_bar: 4 } },
+  { threshold: 0.25, interval: { minMs: 1700, maxMs: 2400 }, weights: { single_box: 6, double_pillar: 2 } },
+  { threshold: 0.6, interval: { minMs: 1300, maxMs: 1900 }, weights: { single_box: 5, double_pillar: 3 } },
+  { threshold: 0.85, interval: { minMs: 1050, maxMs: 1500 }, weights: { single_box: 4, double_pillar: 4 } },
+  { threshold: 1.01, interval: { minMs: 900, maxMs: 1250 }, weights: { single_box: 4, double_pillar: 5 } },
 ];
 
 export class ObstacleSpawner {
@@ -32,7 +32,7 @@ export class ObstacleSpawner {
     private readonly getSpeed: () => number,
     private readonly densityMul: number = 1,
   ) {
-    this.group = scene.physics.add.group({ classType: Obstacle, runChildUpdate: false });
+    this.group = scene.physics.add.group({ classType: Obstacle, runChildUpdate: false, allowGravity: false });
   }
 
   public update(deltaMs: number): void {
@@ -98,10 +98,9 @@ export class ObstacleSpawner {
   private pickKind(weights: Record<ObstacleKind, number>): ObstacleKind {
     const adjusted: Record<ObstacleKind, number> = { ...weights };
     if (this.lastKind) adjusted[this.lastKind] = Math.max(1, Math.floor(adjusted[this.lastKind] / 2));
-    const total = adjusted.flame + adjusted.falling + adjusted.low_bar;
+    const total = adjusted.single_box + adjusted.double_pillar;
     let r = Math.random() * total;
-    if ((r -= adjusted.flame) < 0) return "flame";
-    if ((r -= adjusted.falling) < 0) return "falling";
-    return "low_bar";
+    if ((r -= adjusted.single_box) < 0) return "single_box";
+    return "double_pillar";
   }
 }

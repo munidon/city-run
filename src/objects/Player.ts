@@ -1,29 +1,39 @@
 import * as Phaser from "phaser";
 import { AssetKey } from "@/assets";
 
-const PLAYER_WIDTH = 160;
-const PLAYER_HEIGHT_STAND = 90;
-const PLAYER_WIDTH_JUMP = 160;
-const PLAYER_HEIGHT_JUMP = 90;
-const PLAYER_WIDTH_SLIDE = 160;
-const PLAYER_HEIGHT_SLIDE = 45;
+const PLAYER_WIDTH = 75;
+const PLAYER_HEIGHT_STAND = 130;
+const PLAYER_WIDTH_JUMP = 75;
+const PLAYER_HEIGHT_JUMP = 130;
+const PLAYER_WIDTH_SLIDE = 130;
+const PLAYER_HEIGHT_SLIDE = 80;
 const JUMP_VELOCITY = -600;
 const DOUBLE_JUMP_VELOCITY = -600;
-// const SLIDE_DURATION_MS = 100;
 const GROUND_EPSILON = 2;
-const ANIM_RUN = "player-cat:run";
-const ANIM_JUMP = "player-cat:jump";
-const ANIM_SLIDE = "player-cat:slide";
-const RUN_FRAMES = ["sprite4", "sprite5", "sprite1", "sprite2", "sprite3", "sprite6"];
-const JUMP_FRAMES = ["sprite18", "sprite16", "sprite15", "sprite14", "sprite17", "sprite19"];
-const SLIDE_FRAMES = ["sprite23", "sprite22", "sprite25", "sprite24", "sprite21", "sprite20"];
-type PlayerPose = "run" | "jump" | "slide";
+const HIT_ANIM_DURATION_MS = 700;
+
+const ANIM_RUN = "player-boy:run";
+const ANIM_JUMP = "player-boy:jump";
+const ANIM_SLIDE = "player-boy:slide";
+const ANIM_HIT = "player-boy:hit";
+const ANIM_HIT_JUMP = "player-boy:hit-jump";
+const ANIM_HIT_SLIDE = "player-boy:hit-slide";
+
+const RUN_FRAMES = ["sprite1", "sprite2", "sprite3", "sprite4", "sprite5", "sprite6", "sprite7", "sprite8"];
+const JUMP_FRAMES = ["jump1", "jump2", "jump3", "jump4", "jump5", "jump6"];
+const SLIDE_FRAMES = ["slide1", "slide2", "slide3"];
+const HIT_FRAMES = ["sprite9", "sprite10"];
+const HIT_JUMP_FRAMES = ["jump7", "jump8"];
+const HIT_SLIDE_FRAMES = ["slide14", "slide15"];
+
+type PlayerPose = "run" | "jump" | "slide" | "hit" | "hit-jump" | "hit-slide";
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   private jumpsRemaining = 2;
   private isSliding = false;
+  private isHit = false;
+  private hitTimer?: Phaser.Time.TimerEvent;
   private pose?: PlayerPose;
-  // private slideTimer?: Phaser.Time.TimerEvent;
   private readonly groundY: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -73,21 +83,42 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     scene.anims.create({
       key: ANIM_JUMP,
-      frames: Player.frameRefs(JUMP_FRAMES),
-      frameRate: 10,
+      frames: Player.frameRefs(JUMP_FRAMES, AssetKey.PlayerJump),
+      frameRate: 15,
       repeat: -1,
     });
 
     scene.anims.create({
       key: ANIM_SLIDE,
-      frames: Player.frameRefs(SLIDE_FRAMES),
-      frameRate: 12,
+      frames: Player.frameRefs(SLIDE_FRAMES, AssetKey.PlayerSlide),
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    scene.anims.create({
+      key: ANIM_HIT,
+      frames: Player.frameRefs(HIT_FRAMES),
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    scene.anims.create({
+      key: ANIM_HIT_JUMP,
+      frames: Player.frameRefs(HIT_JUMP_FRAMES, AssetKey.PlayerJump),
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    scene.anims.create({
+      key: ANIM_HIT_SLIDE,
+      frames: Player.frameRefs(HIT_SLIDE_FRAMES, AssetKey.PlayerSlide),
+      frameRate: 8,
       repeat: -1,
     });
   }
 
-  private static frameRefs(frames: string[]): Phaser.Types.Animations.AnimationFrame[] {
-    return frames.map((frame) => ({ key: AssetKey.Player, frame }));
+  private static frameRefs(frames: string[], key: string = AssetKey.Player): Phaser.Types.Animations.AnimationFrame[] {
+    return frames.map((frame) => ({ key, frame }));
   }
 
   public jump(): boolean {
@@ -109,18 +140,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   public slide(): boolean {
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (this.isSliding) return false;
-    if (!this.isGrounded(body)) {
-      return false;
-    }
+    if (!this.isGrounded(body)) return false;
 
     this.snapToGround();
     this.isSliding = true;
     this.applyPose("slide");
     body.setSize(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
     this.snapToGround();
-
-    // this.slideTimer?.remove(false);
-    // this.slideTimer = this.scene.time.delayedCall(SLIDE_DURATION_MS, () => this.endSlide());
     return true;
   }
 
@@ -133,8 +159,37 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.snapToGround();
   }
 
+  public playHit(): void {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    this.isHit = true;
+    this.hitTimer?.remove(false);
+    this.pose = undefined;
+
+    if (this.isSliding) {
+      this.endSlide();
+      this.pose = undefined; // Clear the pose set by endSlide
+      this.applyPose("hit-slide");
+    } else if (this.isGrounded(body)) {
+      this.applyPose("hit");
+    } else {
+      this.applyPose("hit-jump");
+    }
+    this.hitTimer = this.scene.time.delayedCall(HIT_ANIM_DURATION_MS, () => {
+      this.isHit = false;
+      this.pose = undefined;
+    });
+  }
+
   public override update(): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
+
+    // Prevent player from falling below the ground when hit
+    if (this.y >= this.groundY && body.velocity.y >= 0) {
+      this.snapToGround();
+    }
+
+    if (this.isHit) return;
+
     if (this.isSliding) {
       this.snapToGround();
       return;
@@ -151,7 +206,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private isGrounded(body: Phaser.Physics.Arcade.Body): boolean {
     const isRising = body.velocity.y < 0;
-    return body.blocked.down || body.touching.down || (!isRising && this.y >= this.groundY - GROUND_EPSILON);
+    return !isRising && this.y >= this.groundY - GROUND_EPSILON;
   }
 
   private snapToGround(): void {
@@ -166,19 +221,33 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.pose === pose) return;
     this.pose = pose;
 
-    if (pose === "slide") {
-      this.playIfLoaded(ANIM_SLIDE);
-      this.setDisplaySize(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
-      return;
+    switch (pose) {
+      case "hit-slide":
+        this.playIfLoaded(ANIM_HIT_SLIDE);
+        this.setDisplaySize(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
+        break;
+      case "hit-jump":
+        this.playIfLoaded(ANIM_HIT_JUMP);
+        this.setDisplaySize(PLAYER_WIDTH_JUMP, PLAYER_HEIGHT_JUMP);
+        break;
+      case "hit":
+        this.playIfLoaded(ANIM_HIT);
+        this.setDisplaySize(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
+        break;
+      case "slide":
+        this.playIfLoaded(ANIM_SLIDE);
+        this.setDisplaySize(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
+        break;
+      case "jump":
+        this.playIfLoaded(ANIM_JUMP);
+        this.setDisplaySize(PLAYER_WIDTH_JUMP, PLAYER_HEIGHT_JUMP);
+        break;
+      case "run":
+      default:
+        this.playIfLoaded(ANIM_RUN);
+        this.setDisplaySize(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
+        break;
     }
-
-    this.playIfLoaded(pose === "jump" ? ANIM_JUMP : ANIM_RUN);
-    if (pose === "jump") {
-      this.setDisplaySize(PLAYER_WIDTH_JUMP, PLAYER_HEIGHT_JUMP);
-      return;
-    }
-
-    this.setDisplaySize(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
   }
 
   private playIfLoaded(key: string): void {

@@ -25,8 +25,8 @@ export class ItemSpawner {
     private readonly scene: Phaser.Scene,
     private readonly getSpeed: () => number,
   ) {
-    this.itemGroup = scene.physics.add.group({ classType: Item, runChildUpdate: false });
-    this.scrollGroup = scene.physics.add.group({ classType: Scroll, runChildUpdate: false });
+    this.itemGroup = scene.physics.add.group({ classType: Item, runChildUpdate: false, allowGravity: false });
+    this.scrollGroup = scene.physics.add.group({ classType: Scroll, runChildUpdate: false, allowGravity: false });
   }
 
   public update(deltaMs: number): void {
