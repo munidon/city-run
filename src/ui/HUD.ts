@@ -1,7 +1,7 @@
 import * as Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 
-const FONT = "system-ui, -apple-system, sans-serif";
+const FONT = "'Ramche', system-ui, sans-serif";
 
 export class HUD {
   private healthBar: Phaser.GameObjects.Graphics;

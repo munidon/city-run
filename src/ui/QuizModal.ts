@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 import type { QuizQuestion } from "@/data/quizzes";
 
-const FONT = "system-ui, -apple-system, sans-serif";
+const FONT = "'Ramche', system-ui, sans-serif";
 const TIME_LIMIT_MS = 6000;
 const PANEL_W = 980;
 const PANEL_H = 540;

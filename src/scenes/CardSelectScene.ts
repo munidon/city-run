@@ -3,7 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 import { Card, CardCategory, pickThreeCards } from "@/data/cards";
 import { RunState } from "@/state/RunState";
 
-const FONT = "system-ui, -apple-system, sans-serif";
+const FONT = "'Ramche', system-ui, sans-serif";
 
 const CATEGORY_COLOR: Record<CardCategory, number> = {
   permanent: 0x4caf50,
