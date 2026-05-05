@@ -1,53 +1,42 @@
 import * as Phaser from "phaser";
 import { AssetKey } from "@/assets";
 
-const W = 56;
-const H = 64;
+// 제어를 직관적으로 하기 위해 배율(Scale) 대신 명시적인 픽셀 크기 변수로 대체합니다.
+const DISPLAY_SIZE = 64;
+const HIT_SIZE = 32; // 아이템처럼 넉넉한 히트박스를 원하실 경우 이 값을 늘리시면 됩니다.
 
 export class Scroll extends Phaser.Physics.Arcade.Sprite {
   public consumed = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    const tex = Scroll.ensureTexture(scene);
-    super(scene, x, y, tex);
+    super(scene, x, y, AssetKey.Scroll);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setSize(W, H);
+
+    // 1. 화면에 표시될 크기 설정 (내부적으로 this.scaleX, this.scaleY가 계산됨)
+    this.setDisplaySize(DISPLAY_SIZE, DISPLAY_SIZE);
+
+    // 2. 현재 적용된 스케일을 기준으로 히트박스 크기를 역산
+    const scaledHitSizeX = HIT_SIZE / this.scaleX;
+    const scaledHitSizeY = HIT_SIZE / this.scaleY;
+
+    // 3. 중앙 정렬(true)과 함께 역산된 크기를 물리 바디에 적용
+    body.setSize(scaledHitSizeX, scaledHitSizeY, true);
+
     body.setAllowGravity(false);
     body.setImmovable(true);
     this.setDepth(76);
 
     scene.tweens.add({
       targets: this,
-      angle: 6,
-      scale: 1.06,
-      duration: 650,
+      y: y - 6,
+      duration: 700,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
     });
-  }
-
-  private static ensureTexture(scene: Phaser.Scene): string {
-    if (scene.textures.exists(AssetKey.Scroll)) return AssetKey.Scroll;
-
-    const key = "__scroll";
-    if (scene.textures.exists(key)) return key;
-    const g = scene.add.graphics({ x: 0, y: 0 });
-    g.fillStyle(0x6b3f1f, 1);
-    g.fillRoundedRect(0, 0, W, 12, 6);
-    g.fillRoundedRect(0, H - 12, W, 12, 6);
-    g.fillStyle(0xf3e3b0, 1);
-    g.fillRect(4, 10, W - 8, H - 20);
-    g.fillStyle(0x8c5a32, 1);
-    for (let y = 16; y < H - 16; y += 8) {
-      g.fillRect(10, y, W - 20, 2);
-    }
-    g.generateTexture(key, W, H);
-    g.destroy();
-    return key;
   }
 }

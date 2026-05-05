@@ -46,13 +46,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     Player.ensureAnimations(scene);
 
     this.setOrigin(0.5, 1);
-    this.applyPose("run");
     this.setDepth(70);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
+    this.applyPose("run");
     body.setCollideWorldBounds(true);
-    body.setSize(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
-    body.setOffset(0, 0);
     body.setMaxVelocity(0, 1600);
   }
 
@@ -145,7 +143,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.snapToGround();
     this.isSliding = true;
     this.applyPose("slide");
-    body.setSize(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
     this.snapToGround();
     return true;
   }
@@ -154,8 +151,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this.isSliding) return;
     this.isSliding = false;
     this.applyPose("run");
-    const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setSize(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
     this.snapToGround();
   }
 
@@ -224,28 +219,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     switch (pose) {
       case "hit-slide":
         this.playIfLoaded(ANIM_HIT_SLIDE);
-        this.setDisplaySize(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
+        this.updateSizeAndHitbox(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
         break;
       case "hit-jump":
         this.playIfLoaded(ANIM_HIT_JUMP);
-        this.setDisplaySize(PLAYER_WIDTH_JUMP, PLAYER_HEIGHT_JUMP);
+        this.updateSizeAndHitbox(PLAYER_WIDTH_JUMP, PLAYER_HEIGHT_JUMP);
         break;
       case "hit":
         this.playIfLoaded(ANIM_HIT);
-        this.setDisplaySize(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
+        this.updateSizeAndHitbox(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
         break;
       case "slide":
         this.playIfLoaded(ANIM_SLIDE);
-        this.setDisplaySize(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
+        this.updateSizeAndHitbox(PLAYER_WIDTH_SLIDE, PLAYER_HEIGHT_SLIDE);
         break;
       case "jump":
         this.playIfLoaded(ANIM_JUMP);
-        this.setDisplaySize(PLAYER_WIDTH_JUMP, PLAYER_HEIGHT_JUMP);
+        this.updateSizeAndHitbox(PLAYER_WIDTH_JUMP, PLAYER_HEIGHT_JUMP);
         break;
       case "run":
       default:
         this.playIfLoaded(ANIM_RUN);
-        this.setDisplaySize(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
+        this.updateSizeAndHitbox(PLAYER_WIDTH, PLAYER_HEIGHT_STAND);
         break;
     }
   }
@@ -258,5 +253,26 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   public get sliding(): boolean {
     return this.isSliding;
+  }
+
+  private updateSizeAndHitbox(targetWidth: number, targetHeight: number): void {
+    // 1. 화면 표시 크기는 그대로 적용
+    this.setDisplaySize(targetWidth, targetHeight);
+
+    // 💡 히트박스를 시각적 크기의 몇 %로 할지 결정합니다 (예: 80%)
+    const HITBOX_RATIO_X = 0.6;
+    const HITBOX_RATIO_Y = 0.8; // 세로는 너무 많이 줄이면 바닥 판정이 어색해질 수 있어 90%로 설정
+
+    // 2. 스케일 역산 후 비율(Ratio)을 곱해 히트박스를 축소
+    const scaledWidth = (targetWidth / this.scaleX) * HITBOX_RATIO_X;
+    const scaledHeight = (targetHeight / this.scaleY) * HITBOX_RATIO_Y;
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setSize(scaledWidth, scaledHeight);
+
+    // 3. 줄어든 히트박스에 맞춰 오프셋 재계산 (히트박스가 하단 중앙에 오도록 유지)
+    const offsetX = (this.width - scaledWidth) / 2;
+    const offsetY = this.height - scaledHeight;
+    body.setOffset(offsetX, offsetY);
   }
 }

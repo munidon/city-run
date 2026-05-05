@@ -14,7 +14,7 @@ interface DisasterConfig {
 }
 
 const DEFAULT_CONFIG: DisasterConfig = {
-  rollProgress: 0.4,
+  rollProgress: 0.1,
   rollChance: 0.3,
   forcedProgress: 0.75,
   scrollDelayMsMin: 7000,

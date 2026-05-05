@@ -5,6 +5,7 @@ import { MainMenuScene } from "@/scenes/MainMenuScene";
 import { GameScene } from "@/scenes/GameScene";
 import { CardSelectScene } from "@/scenes/CardSelectScene";
 import { SettingsScene } from "@/scenes/SettingsScene";
+import { AssetPreviewScene } from "@/scenes/AssetPreviewScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -27,7 +28,7 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     activePointers: 3,
   },
-  scene: [BootScene, MainMenuScene, SettingsScene, GameScene, CardSelectScene],
+  scene: [BootScene, MainMenuScene, SettingsScene, AssetPreviewScene, GameScene, CardSelectScene],
 };
 
 const game = new Phaser.Game(config);

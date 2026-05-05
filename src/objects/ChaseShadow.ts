@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { GAME_HEIGHT } from "@/config";
+import { AssetKey } from "@/assets";
 
 const SHADOW_WIDTH = 240;
 const PARTICLE_COUNT = 22;
@@ -8,6 +9,7 @@ export class ChaseShadow {
   private container: Phaser.GameObjects.Container;
   private gradient: Phaser.GameObjects.Graphics;
   private edgeFlicker: Phaser.GameObjects.Graphics;
+  private spiritSprite: Phaser.GameObjects.Sprite;
   private particles: Phaser.GameObjects.Arc[] = [];
   private particleData: { vy: number; life: number; maxLife: number; r: number }[] = [];
   private flickerPhase = 0;
@@ -18,6 +20,22 @@ export class ChaseShadow {
     this.gradient = scene.add.graphics();
     this.edgeFlicker = scene.add.graphics();
 
+    this.spiritSprite = scene.add.sprite(0, GAME_HEIGHT * 0.5, AssetKey.DisasterFire, "sprite3");
+    this.spiritSprite.setScale(1.5);
+
+    if (!scene.anims.exists("fire_spirit_anim")) {
+      scene.anims.create({
+        key: "fire_spirit_anim",
+        frames: scene.anims.generateFrameNames(AssetKey.DisasterFire, {
+          prefix: "sprite",
+          frames: [3, 4, 5, 6, 10, 11, 12, 13]
+        }),
+        frameRate: 12,
+        repeat: -1
+      });
+    }
+    this.spiritSprite.play("fire_spirit_anim");
+
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const c = scene.add.circle(0, 0, 4, 0xffaa3d, 0.0);
       this.particles.push(c);
@@ -25,7 +43,7 @@ export class ChaseShadow {
     }
 
     this.container = scene.add
-      .container(0, 0, [this.gradient, this.edgeFlicker, ...this.particles])
+      .container(0, 0, [this.gradient, this.spiritSprite, this.edgeFlicker, ...this.particles])
       .setDepth(900)
       .setScrollFactor(0);
 
@@ -35,6 +53,9 @@ export class ChaseShadow {
   public update(deltaMs: number): void {
     if (this.destroyed) return;
     this.flickerPhase += deltaMs / 100;
+
+    this.spiritSprite.x = this.visualX + SHADOW_WIDTH * 0.3;
+    this.spiritSprite.y = GAME_HEIGHT * 0.55 + Math.sin(this.flickerPhase * 0.5) * 15;
 
     for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];

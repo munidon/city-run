@@ -285,7 +285,7 @@ export class GameScene extends Phaser.Scene {
     const nearScale = GAME_HEIGHT / this.textureHeight(nearKey, GAME_HEIGHT);
     this.bgNear.tileScaleX = nearScale;
     this.bgNear.tileScaleY = nearScale;
-    const bgNearOffsetY = this.bgOffsetY - 20;
+    const bgNearOffsetY = this.bgOffsetY - 30;
     this.bgNear.tilePositionY = bgNearOffsetY;
   }
 

@@ -1,10 +1,11 @@
 import * as Phaser from "phaser";
 import { AssetKey } from "@/assets";
 
-export type ItemKind = "bread" | "lunchbox" | "coin";
+export type ItemKind = "gimbap" | "bento" | "coin";
 
 interface ItemSpec {
   size: number;
+  hitSize?: number;
   healPct: number;
   coins: number;
   color: number;
@@ -13,14 +14,14 @@ interface ItemSpec {
 }
 
 const SPECS: Record<ItemKind, ItemSpec> = {
-  bread: { size: 38, healPct: 2, coins: 0, color: 0xf5c98a, accent: 0xb47b3b, label: "B" },
-  lunchbox: { size: 48, healPct: 5, coins: 0, color: 0xff7a59, accent: 0xffffff, label: "L" },
-  coin: { size: 32, healPct: 0, coins: 1, color: 0xffd73d, accent: 0xb38600, label: "$" },
+  gimbap: { size: 64, hitSize: 32, healPct: 2, coins: 0, color: 0xf5c98a, accent: 0xb47b3b, label: "G" },
+  bento: { size: 64, hitSize: 32, healPct: 5, coins: 0, color: 0xff7a59, accent: 0xffffff, label: "B" },
+  coin: { size: 48, hitSize: 24, healPct: 0, coins: 1, color: 0xffd73d, accent: 0xb38600, label: "$" },
 };
 
 const ASSET_KEYS: Record<ItemKind, string> = {
-  bread: AssetKey.ItemBread,
-  lunchbox: AssetKey.ItemLunchbox,
+  gimbap: AssetKey.ItemGimbap,
+  bento: AssetKey.ItemBento,
   coin: AssetKey.ItemCoin,
 };
 
@@ -32,8 +33,8 @@ export class Item extends Phaser.Physics.Arcade.Sprite {
 
   constructor(scene: Phaser.Scene, x: number, y: number, kind: ItemKind) {
     const spec = SPECS[kind];
-    const tex = Item.ensureTexture(scene, kind, spec);
-    super(scene, x, y, tex);
+    const assetKey = ASSET_KEYS[kind];
+    super(scene, x, y, assetKey);
 
     this.kind = kind;
     this.healPct = spec.healPct;
@@ -43,14 +44,25 @@ export class Item extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setSize(spec.size, spec.size);
+    this.setDisplaySize(spec.size, spec.size);
+    const hitSize = spec.hitSize ?? spec.size;
+    // const hitOffset = (hitSize - spec.size) / 2;
+    // body.setSize(hitSize, hitSize);
+    // body.setOffset(-hitOffset, -hitOffset);
+    // 1. hitSize를 현재 스케일로 나누어 '원본 텍스처 기준의 물리 바디 크기'를 구합니다.
+    const scaledHitSizeX = hitSize / this.scaleX;
+    const scaledHitSizeY = hitSize / this.scaleY;
+
+    // 2. 세 번째 인자(center)를 true로 설정하면 복잡한 Offset 계산 없이 자동으로 스프라이트 정중앙에 히트박스가 맞춰집니다.
+    body.setSize(scaledHitSizeX, scaledHitSizeY, true);
+
     body.setAllowGravity(false);
     body.setImmovable(true);
     this.setDepth(75);
 
     scene.tweens.add({
       targets: this,
-      scale: 1.08,
+      y: y - 6,
       duration: 700,
       yoyo: true,
       repeat: -1,
@@ -58,38 +70,4 @@ export class Item extends Phaser.Physics.Arcade.Sprite {
     });
   }
 
-  private static ensureTexture(scene: Phaser.Scene, kind: ItemKind, spec: ItemSpec): string {
-    const assetKey = ASSET_KEYS[kind];
-    if (scene.textures.exists(assetKey)) return assetKey;
-
-    const key = `__item_${kind}`;
-    if (scene.textures.exists(key)) return key;
-    const g = scene.add.graphics({ x: 0, y: 0 });
-    const s = spec.size;
-
-    if (kind === "coin") {
-      g.fillStyle(spec.accent, 1);
-      g.fillCircle(s / 2, s / 2, s / 2);
-      g.fillStyle(spec.color, 1);
-      g.fillCircle(s / 2, s / 2, s / 2 - 3);
-      g.fillStyle(spec.accent, 1);
-      g.fillRect(s * 0.45, s * 0.25, s * 0.1, s * 0.5);
-    } else if (kind === "bread") {
-      g.fillStyle(spec.accent, 1);
-      g.fillRoundedRect(0, 0, s, s, 10);
-      g.fillStyle(spec.color, 1);
-      g.fillRoundedRect(3, 3, s - 6, s - 6, 8);
-    } else {
-      g.fillStyle(spec.accent, 1);
-      g.fillRoundedRect(0, 0, s, s, 6);
-      g.fillStyle(spec.color, 1);
-      g.fillRoundedRect(3, 3, s - 6, s - 6, 4);
-      g.fillStyle(0xffffff, 0.6);
-      g.fillRect(s * 0.2, s * 0.45, s * 0.6, 3);
-    }
-
-    g.generateTexture(key, s, s);
-    g.destroy();
-    return key;
-  }
 }

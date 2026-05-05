@@ -9,10 +9,10 @@ interface IntervalRange {
 }
 
 const ITEM_INTERVAL: IntervalRange = { minMs: 1400, maxMs: 2200 };
-const ITEM_WEIGHTS: Record<ItemKind, number> = { bread: 6, lunchbox: 2, coin: 5 };
+const ITEM_WEIGHTS: Record<ItemKind, number> = { gimbap: 6, bento: 2, coin: 5 };
 
 const Y_LOW = GROUND_Y - 60;
-const Y_MID = GROUND_Y - 160;
+const Y_MID = GROUND_Y - 120;
 const Y_HIGH = GROUND_Y - 240;
 
 export class ItemSpawner {
@@ -94,15 +94,15 @@ export class ItemSpawner {
   }
 
   private pickKind(): ItemKind {
-    const total = ITEM_WEIGHTS.bread + ITEM_WEIGHTS.lunchbox + ITEM_WEIGHTS.coin;
+    const total = ITEM_WEIGHTS.gimbap + ITEM_WEIGHTS.bento + ITEM_WEIGHTS.coin;
     let r = Math.random() * total;
-    if ((r -= ITEM_WEIGHTS.bread) < 0) return "bread";
-    if ((r -= ITEM_WEIGHTS.lunchbox) < 0) return "lunchbox";
+    if ((r -= ITEM_WEIGHTS.gimbap) < 0) return "gimbap";
+    if ((r -= ITEM_WEIGHTS.bento) < 0) return "bento";
     return "coin";
   }
 
   private pickY(kind: ItemKind): number {
-    if (kind === "lunchbox") return Math.random() < 0.5 ? Y_LOW : Y_MID;
+    if (kind === "bento") return Math.random() < 0.5 ? Y_LOW : Y_MID;
     const r = Math.random();
     if (r < 0.45) return Y_LOW;
     if (r < 0.85) return Y_MID;

@@ -55,9 +55,17 @@ export class SettingsScene extends Phaser.Scene {
       textColor: "#7777aa",
     });
 
+    makeButton(this, cx, cy - 40, "에셋 미리보기", () => this.scene.start("AssetPreviewScene"), {
+      width: 200,
+      height: 50,
+      bgColor: 0x2a3a5a,
+      fontSize: "22px",
+      textColor: "#ffffff",
+    });
+
     // placeholder area
     this.add
-      .text(cx, cy, "추가 설정 항목은 업데이트 예정입니다", {
+      .text(cx, cy + 40, "추가 설정 항목은 업데이트 예정입니다", {
         fontFamily: FONT,
         fontSize: "18px",
         color: "#333355",
