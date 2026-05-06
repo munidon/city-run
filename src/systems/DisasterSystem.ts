@@ -1,9 +1,7 @@
 export type DisasterListener = () => void;
 
 interface DisasterConfig {
-  rollProgress: number;
-  rollChance: number;
-  forcedProgress: number;
+  triggerPoints: number[];
   scrollDelayMsMin: number;
   scrollDelayMsMax: number;
   speedBonus: number;
@@ -14,9 +12,7 @@ interface DisasterConfig {
 }
 
 const DEFAULT_CONFIG: DisasterConfig = {
-  rollProgress: 0.1,
-  rollChance: 0.3,
-  forcedProgress: 0.75,
+  triggerPoints: [0.25, 0.5, 0.75],
   scrollDelayMsMin: 7000,
   scrollDelayMsMax: 10000,
   speedBonus: 0.3,
@@ -27,7 +23,7 @@ const DEFAULT_CONFIG: DisasterConfig = {
 };
 
 export class DisasterSystem {
-  private rolled = false;
+  private currentWave = 0;
   private triggered = false;
   private resolved = false;
   private msSinceTrigger = 0;
@@ -45,12 +41,10 @@ export class DisasterSystem {
   }
 
   public tick(deltaMs: number, progress01: number): void {
+    if (this.currentWave >= this.config.triggerPoints.length) return;
+
     if (!this.triggered) {
-      if (!this.rolled && progress01 >= this.config.rollProgress) {
-        this.rolled = true;
-        if (Math.random() < this.config.rollChance) this.trigger();
-      }
-      if (!this.triggered && progress01 >= this.config.forcedProgress) {
+      if (progress01 >= this.config.triggerPoints[this.currentWave]) {
         this.trigger();
       }
       return;
@@ -61,6 +55,11 @@ export class DisasterSystem {
       if (this.chaseX <= this.config.chaseStartX) {
         this.chaseX = this.config.chaseStartX;
         this.retreating = false;
+        this.currentWave++;
+        this.triggered = false;
+        this.resolved = false;
+        this.msSinceTrigger = 0;
+        this.scrollSpawned = false;
       }
       return;
     }

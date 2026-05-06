@@ -102,7 +102,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.setCoins(this.run.totalCoins);
 
     this.disaster.onTrigger(() => {
-      this.hud.setDisasterStatus("⚠ 재난 가속 — 두루마리를 찾아라!");
+      this.hud.setDisasterStatus("⚠ 재난 출현 — 두루마리를 찾아라!");
       this.cameras.main.shake(400, 0.005);
       this.chase?.destroy();
       this.chase = new ChaseShadow(this);
@@ -149,8 +149,19 @@ export class GameScene extends Phaser.Scene {
     if (this.chase) {
       this.chase.setX(this.disaster.chasePosition);
       this.chase.update(delta);
-      const playerLeftEdge = this.player.x - 28;
-      if (this.disaster.chasePosition >= playerLeftEdge && !this.disaster.hasResolved) {
+
+      // --- 수정된 충돌(사망) 판정 로직 ---
+      const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
+      const playerRightEdge = playerBody.right; // 플레이어 히트박스의 우측 끝 절대 좌표
+
+      // 불의 정령(재난)의 우측 끝 절대 좌표 계산
+      // 불의 정령 스프라이트가 visualX(chasePosition) + 72 위치에 렌더링되고 있으므로,
+      // 오프셋을 늘릴 수록 바깥쪽에서 죽음
+      const FIRE_OFFSET = 200;
+      const fireRightEdge = this.disaster.chasePosition + FIRE_OFFSET;
+
+      // 불길의 오른쪽 끝이 플레이어의 오른쪽 끝을 완전히 덮치면 사망
+      if (fireRightEdge >= playerRightEdge && !this.disaster.hasResolved) {
         this.handleChaseCaught();
         return;
       }

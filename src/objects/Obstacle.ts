@@ -19,7 +19,7 @@ const SPECS: Record<ObstacleKind, ObstacleSpec> = {
   single_box: {
     width: 60,
     height: 70,
-    damagePct: 10,
+    damagePct: 5,
     color: 0x8b5a2b,
     accent: 0xa0522d,
     spawnY: GROUND_Y - 35,
@@ -29,7 +29,7 @@ const SPECS: Record<ObstacleKind, ObstacleSpec> = {
   double_pillar: {
     width: 50,
     height: 155,
-    damagePct: 15,
+    damagePct: 10,
     color: 0x708090,
     accent: 0xa9a9a9,
     spawnY: GROUND_Y - 77.5,

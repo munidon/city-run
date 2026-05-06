@@ -9,7 +9,7 @@ interface IntervalRange {
 }
 
 const ITEM_INTERVAL: IntervalRange = { minMs: 1400, maxMs: 2200 };
-const ITEM_WEIGHTS: Record<ItemKind, number> = { gimbap: 6, bento: 2, coin: 5 };
+const ITEM_WEIGHTS: Record<ItemKind, number> = { gimbap: 4, bento: 2, coin: 5 };
 
 const Y_LOW = GROUND_Y - 60;
 const Y_MID = GROUND_Y - 120;

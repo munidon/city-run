@@ -260,7 +260,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setDisplaySize(targetWidth, targetHeight);
 
     // 💡 히트박스를 시각적 크기의 몇 %로 할지 결정합니다 (예: 80%)
-    const HITBOX_RATIO_X = 0.6;
+    const HITBOX_RATIO_X = 0.5;
     const HITBOX_RATIO_Y = 0.8; // 세로는 너무 많이 줄이면 바닥 판정이 어색해질 수 있어 90%로 설정
 
     // 2. 스케일 역산 후 비율(Ratio)을 곱해 히트박스를 축소
