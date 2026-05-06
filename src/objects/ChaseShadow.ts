@@ -36,7 +36,7 @@ export class ChaseShadow {
       .setScrollFactor(0);
   }
 
-  public update(deltaMs: number): void {
+  public update(): void {
     if (this.destroyed) return;
 
     // 스프라이트의 위치만 visualX에 맞춰 따라오도록 업데이트합니다.

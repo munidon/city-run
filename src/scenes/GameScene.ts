@@ -148,7 +148,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.chase) {
       this.chase.setX(this.disaster.chasePosition);
-      this.chase.update(delta);
+      this.chase.update();
 
       // --- 수정된 충돌(사망) 판정 로직 ---
       const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
