@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { SoundKey } from "@/assets";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 import { Card, CardCategory, pickThreeCards } from "@/data/cards";
 import { RunState } from "@/state/RunState";
@@ -145,7 +146,10 @@ export class CardSelectScene extends Phaser.Scene {
 
     hit.on("pointerover", () => drawBg(true));
     hit.on("pointerout", () => drawBg(false));
-    hit.on("pointerdown", () => this.choose(idx));
+    hit.on("pointerdown", () => {
+      this.sound.play(SoundKey.Settings);
+      this.choose(idx);
+    });
   }
 
   private choose(idx: number): void {

@@ -14,10 +14,10 @@ interface PhaseConfig {
 }
 
 const PHASES: PhaseConfig[] = [
-  { threshold: 0.25, interval: { minMs: 1700, maxMs: 2400 }, weights: { single_box: 6, double_pillar: 2 } },
-  { threshold: 0.6, interval: { minMs: 1300, maxMs: 1900 }, weights: { single_box: 5, double_pillar: 3 } },
-  { threshold: 0.85, interval: { minMs: 1050, maxMs: 1500 }, weights: { single_box: 4, double_pillar: 4 } },
-  { threshold: 1.01, interval: { minMs: 900, maxMs: 1250 }, weights: { single_box: 4, double_pillar: 5 } },
+  { threshold: 0.25, interval: { minMs: 1700, maxMs: 2400 }, weights: { smoke: 6, pillar: 2 } },
+  { threshold: 0.6, interval: { minMs: 1300, maxMs: 1900 }, weights: { smoke: 5, pillar: 3 } },
+  { threshold: 0.85, interval: { minMs: 1050, maxMs: 1500 }, weights: { smoke: 4, pillar: 4 } },
+  { threshold: 1.01, interval: { minMs: 900, maxMs: 1250 }, weights: { smoke: 4, pillar: 5 } },
 ];
 
 export class ObstacleSpawner {
@@ -50,6 +50,10 @@ export class ObstacleSpawner {
     for (const child of this.group.getChildren()) {
       const obs = child as Obstacle;
       if (!obs.active) continue;
+      if (obs.getData("launched")) {
+        if (obs.x > SPAWN_X + 320 || obs.y < -200) obs.destroy();
+        continue;
+      }
       const body = obs.body as Phaser.Physics.Arcade.Body;
       body.setVelocityX(-speed);
       if (obs.x < DESPAWN_X) obs.destroy();
@@ -98,9 +102,9 @@ export class ObstacleSpawner {
   private pickKind(weights: Record<ObstacleKind, number>): ObstacleKind {
     const adjusted: Record<ObstacleKind, number> = { ...weights };
     if (this.lastKind) adjusted[this.lastKind] = Math.max(1, Math.floor(adjusted[this.lastKind] / 2));
-    const total = adjusted.single_box + adjusted.double_pillar;
+    const total = adjusted.smoke + adjusted.pillar;
     let r = Math.random() * total;
-    if ((r -= adjusted.single_box) < 0) return "single_box";
-    return "double_pillar";
+    if ((r -= adjusted.smoke) < 0) return "smoke";
+    return "pillar";
   }
 }

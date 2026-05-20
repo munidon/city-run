@@ -2,28 +2,49 @@ export const AssetKey = {
   Player: "asset:player",
   PlayerJump: "asset:player:jump",
   PlayerSlide: "asset:player:slide",
-  ObstacleSingleBox: "asset:obstacle:single_box",
-  ObstacleDoublePillar: "asset:obstacle:double_pillar",
+  ObstacleSmoke: "asset:obstacle:smoke",
+  ObstaclePillar: "asset:obstacle:pillar",
   BackgroundBack: "asset:background:back",
   BackgroundMid: "asset:background:mid",
   Road: "asset:road",
+  Deck: "asset:deck",
   ItemGimbap: "asset:item:gimbap",
   ItemBento: "asset:item:bento",
   ItemCoin: "asset:item:coin",
+  ItemEnergyDrink: "asset:item:energy_drink",
+  ItemFireExtinguisher: "asset:item:fire_extinguisher",
+  ItemGasMask: "asset:item:gas_mask",
+  ItemWetTowel: "asset:item:wet_towel",
   Scroll: "asset:scroll",
   DisasterFire: "asset:disaster:fire",
 
   TitleLogo: "asset:ui:title-logo",
 } as const;
 
+export const SoundKey = {
+  Bgm: "sound:bgm",
+  GameStart: "sound:game_Start",
+  DisasterAppear: "sound:disaster_Appear",
+  BossHit: "sound:boss_Hit",
+  StageClear: "sound:stage_Clear",
+  Exit: "sound:exit",
+  Settings: "sound:settings",
+} as const;
+
 export const GAME_IMAGE_ASSETS: Array<{ key: string; path: string }> = [
-  // Obstacles are generated dynamically by Obstacle.ts
+  { key: AssetKey.ObstacleSmoke, path: "assets/obstacles/smoke.png" },
+  { key: AssetKey.ObstaclePillar, path: "assets/obstacles/pillar.png" },
   { key: AssetKey.BackgroundBack, path: "assets/environment/bg_far.png" },
   { key: AssetKey.BackgroundMid, path: "assets/environment/bg_mid.png" },
   { key: AssetKey.Road, path: "assets/environment/road.png" },
+  { key: AssetKey.Deck, path: "assets/environment/deck.png" },
   { key: AssetKey.ItemGimbap, path: "assets/items/gimbap.png" },
   { key: AssetKey.ItemBento, path: "assets/items/bento.png" },
   { key: AssetKey.ItemCoin, path: "assets/items/coin.png" },
+  { key: AssetKey.ItemEnergyDrink, path: "assets/items/energy_drink.png" },
+  { key: AssetKey.ItemFireExtinguisher, path: "assets/items/fire_extinguisher.png" },
+  { key: AssetKey.ItemGasMask, path: "assets/items/gas_mask.png" },
+  { key: AssetKey.ItemWetTowel, path: "assets/items/wet_towel.png" },
   { key: AssetKey.Scroll, path: "assets/items/scroll.png" },
 
   { key: AssetKey.TitleLogo, path: "assets/ui/title-logo.png" },
@@ -50,4 +71,14 @@ export const GAME_ATLAS_ASSETS: Array<{ key: string; texturePath: string; atlasP
     texturePath: "assets/player/player_slide_sprites.png",
     atlasPath: "assets/player/player_slide_sprites.json",
   },
+];
+
+export const GAME_AUDIO_ASSETS: Array<{ key: string; path: string }> = [
+  { key: SoundKey.Bgm, path: "assets/music/Final_Sprint_to_the_Gates.mp3" },
+  { key: SoundKey.GameStart, path: "assets/sound/game_Start.wav" },
+  { key: SoundKey.DisasterAppear, path: "assets/sound/disaster_Appear.wav" },
+  { key: SoundKey.BossHit, path: "assets/sound/boss_Hit.wav" },
+  { key: SoundKey.StageClear, path: "assets/sound/stage_Clear.wav" },
+  { key: SoundKey.Exit, path: "assets/sound/exit.wav" },
+  { key: SoundKey.Settings, path: "assets/sound/settings.wav" },
 ];

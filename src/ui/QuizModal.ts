@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { SoundKey } from "@/assets";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 import type { QuizQuestion } from "@/data/quizzes";
 
@@ -133,6 +134,7 @@ export class QuizModal {
     });
     hit.on("pointerdown", () => {
       if (this.resolved) return;
+      this.scene.sound.play(SoundKey.Settings);
       this.finish(idx === this.question.answerIndex ? "correct" : "wrong", idx);
     });
 
@@ -164,6 +166,8 @@ export class QuizModal {
     if (this.resolved) return;
     this.resolved = true;
     this.timerEvent.remove(false);
+    // 정답 설명 화면이 떴을 때 질문 모달이 뒤에 비쳐 보이지 않도록 숨김
+    this.container.setVisible(false);
     this.showExplanation(result);
   }
 
@@ -246,13 +250,18 @@ export class QuizModal {
       if (!this.explanationContainer) return;
       this.explanationContainer.destroy(true);
       this.explanationContainer = undefined;
+      this.container.setVisible(true);
       this.container.destroy(true);
       this.onDone(result, this.question);
     };
 
-    this.scene.input.keyboard?.once("keydown-SPACE", close);
-    this.scene.input.keyboard?.once("keydown-ENTER", close);
-    this.scene.input.once(Phaser.Input.Events.POINTER_DOWN, close);
+    // 같은 pointer-down/keydown 이벤트가 즉시 close를 트리거하지 않도록 다음 틱에 핸들러 등록
+    this.scene.time.delayedCall(250, () => {
+      if (!this.explanationContainer) return;
+      this.scene.input.keyboard?.once("keydown-SPACE", close);
+      this.scene.input.keyboard?.once("keydown-ENTER", close);
+      this.scene.input.once(Phaser.Input.Events.POINTER_DOWN, close);
+    });
   }
 
   public destroy(): void {

@@ -9,7 +9,16 @@ interface IntervalRange {
 }
 
 const ITEM_INTERVAL: IntervalRange = { minMs: 1400, maxMs: 2200 };
-const ITEM_WEIGHTS: Record<ItemKind, number> = { gimbap: 4, bento: 2, coin: 5 };
+// 코인은 SegmentManager가 맵 데이터 기반으로 스폰하므로 여기서는 가중치 0
+export const ITEM_SPAWN_WEIGHTS: Record<ItemKind, number> = {
+  gimbap: 4,
+  bento: 2,
+  coin: 0,
+  energy_drink: 1,
+  fire_extinguisher: 1,
+  gas_mask: 2,
+  wet_towel: 2,
+};
 
 const Y_LOW = GROUND_Y - 60;
 const Y_MID = GROUND_Y - 120;
@@ -24,6 +33,7 @@ export class ItemSpawner {
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly getSpeed: () => number,
+    private readonly getIsDisasterActive: () => boolean = () => false,
   ) {
     this.itemGroup = scene.physics.add.group({ classType: Item, runChildUpdate: false, allowGravity: false });
     this.scrollGroup = scene.physics.add.group({ classType: Scroll, runChildUpdate: false, allowGravity: false });
@@ -84,6 +94,13 @@ export class ItemSpawner {
     this.scrollGroup.clear(true, true);
   }
 
+  public removeItemsByKind(kind: ItemKind): void {
+    for (const child of this.itemGroup.getChildren()) {
+      const item = child as Item;
+      if (item.kind === kind) item.destroy();
+    }
+  }
+
   private spawnItem(): void {
     const kind = this.pickKind();
     const y = this.pickY(kind);
@@ -94,15 +111,21 @@ export class ItemSpawner {
   }
 
   private pickKind(): ItemKind {
-    const total = ITEM_WEIGHTS.gimbap + ITEM_WEIGHTS.bento + ITEM_WEIGHTS.coin;
+    const entries = (Object.entries(ITEM_SPAWN_WEIGHTS) as Array<[ItemKind, number]>).filter(
+      ([kind, weight]) => weight > 0 && !(kind === "energy_drink" && this.getIsDisasterActive()),
+    );
+    const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+    if (entries.length === 0 || total <= 0) return "gimbap";
     let r = Math.random() * total;
-    if ((r -= ITEM_WEIGHTS.gimbap) < 0) return "gimbap";
-    if ((r -= ITEM_WEIGHTS.bento) < 0) return "bento";
-    return "coin";
+    for (const [kind, weight] of entries) {
+      if ((r -= weight) < 0) return kind;
+    }
+    return entries[entries.length - 1][0];
   }
 
   private pickY(kind: ItemKind): number {
-    if (kind === "bento") return Math.random() < 0.5 ? Y_LOW : Y_MID;
+    if (kind === "bento" || kind === "fire_extinguisher") return Math.random() < 0.5 ? Y_LOW : Y_MID;
+    if (kind === "energy_drink") return Math.random() < 0.65 ? Y_MID : Y_HIGH;
     const r = Math.random();
     if (r < 0.45) return Y_LOW;
     if (r < 0.85) return Y_MID;

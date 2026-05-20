@@ -7,8 +7,8 @@ const PLAYER_WIDTH_JUMP = 75;
 const PLAYER_HEIGHT_JUMP = 130;
 const PLAYER_WIDTH_SLIDE = 130;
 const PLAYER_HEIGHT_SLIDE = 80;
-const JUMP_VELOCITY = -600;
-const DOUBLE_JUMP_VELOCITY = -600;
+const JUMP_VELOCITY = -750;
+const DOUBLE_JUMP_VELOCITY = -700;
 const GROUND_EPSILON = 2;
 const HIT_ANIM_DURATION_MS = 700;
 
@@ -34,12 +34,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private isHit = false;
   private hitTimer?: Phaser.Time.TimerEvent;
   private pose?: PlayerPose;
-  private readonly groundY: number;
+  private readonly floorY: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     const tex = Player.ensureTexture(scene);
     super(scene, x, y, tex, scene.textures.exists(AssetKey.Player) ? RUN_FRAMES[0] : undefined);
-    this.groundY = y;
+    this.floorY = y;
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -140,10 +140,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.isSliding) return false;
     if (!this.isGrounded(body)) return false;
 
-    this.snapToGround();
     this.isSliding = true;
     this.applyPose("slide");
-    this.snapToGround();
     return true;
   }
 
@@ -151,7 +149,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this.isSliding) return;
     this.isSliding = false;
     this.applyPose("run");
-    this.snapToGround();
   }
 
   public playHit(): void {
@@ -175,24 +172,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     });
   }
 
+  public snapToSupport(y: number): void {
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    this.y = y;
+    if (body) {
+      body.setVelocityY(0);
+    }
+  }
+
   public override update(): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
 
-    // Prevent player from falling below the ground when hit
-    if (this.y >= this.groundY && body.velocity.y >= 0) {
-      this.snapToGround();
+    // 화면 바닥(floorY) 아래로 떨어지지 않도록 안전 캡
+    if (this.y > this.floorY && body.velocity.y >= 0) {
+      this.snapToFloor();
     }
 
     if (this.isHit) return;
 
-    if (this.isSliding) {
-      this.snapToGround();
-      return;
-    }
+    if (this.isSliding) return;
 
     if (this.isGrounded(body)) {
       this.jumpsRemaining = 2;
-      this.snapToGround();
       this.applyPose("run");
     } else {
       this.applyPose("jump");
@@ -200,13 +201,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private isGrounded(body: Phaser.Physics.Arcade.Body): boolean {
-    const isRising = body.velocity.y < 0;
-    return !isRising && this.y >= this.groundY - GROUND_EPSILON;
+    if (body.velocity.y < 0) return false;
+    // 물리 충돌체로 무언가 위에 서 있는지 판정 (지면 또는 플랫폼)
+    if (body.blocked.down || body.touching.down) return true;
+    // 안전망: floorY 근처라면 접지로 간주
+    return this.y >= this.floorY - GROUND_EPSILON;
   }
 
-  private snapToGround(): void {
+  private snapToFloor(): void {
     const body = this.body as Phaser.Physics.Arcade.Body | null;
-    this.y = this.groundY;
+    this.y = this.floorY;
     if (body) {
       body.setVelocityY(0);
     }

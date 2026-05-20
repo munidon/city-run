@@ -140,6 +140,11 @@ export const CHAPTER_1_QUIZZES: QuizQuestion[] = [
   }
 ];
 
-export function pickRandomQuiz(pool: QuizQuestion[] = CHAPTER_1_QUIZZES): QuizQuestion {
-  return pool[Math.floor(Math.random() * pool.length)];
+export function pickRandomQuiz(
+  pool: QuizQuestion[] = CHAPTER_1_QUIZZES,
+  excludedIds: ReadonlySet<string> = new Set(),
+): QuizQuestion {
+  const candidates = pool.filter((quiz) => !excludedIds.has(quiz.id));
+  const source = candidates.length > 0 ? candidates : pool;
+  return source[Math.floor(Math.random() * source.length)];
 }

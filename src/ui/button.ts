@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { SoundKey } from "@/assets";
 
 const FONT = "'Ramche', system-ui, sans-serif";
 
@@ -8,6 +9,7 @@ export interface ButtonCfg {
   bgColor?: number;
   textColor?: string;
   fontSize?: string;
+  soundKey?: string | false;
 }
 
 export function makeButton(
@@ -36,6 +38,8 @@ export function makeButton(
   bg.on("pointerdown", () => bg.setAlpha(0.5));
   bg.on("pointerup", () => {
     bg.setAlpha(1);
+    const soundKey = cfg.soundKey ?? SoundKey.Settings;
+    if (soundKey !== false) scene.sound.play(soundKey);
     onClick();
   });
   return ctr;

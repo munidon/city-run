@@ -12,7 +12,7 @@ interface DisasterConfig {
 }
 
 const DEFAULT_CONFIG: DisasterConfig = {
-  triggerPoints: [0.25, 0.5, 0.75],
+  triggerPoints: [0.2, 0.4, 0.6, 0.8],
   scrollDelayMsMin: 7000,
   scrollDelayMsMax: 10000,
   speedBonus: 0.3,
@@ -31,6 +31,7 @@ export class DisasterSystem {
   private scrollSpawned = false;
   private chaseX = 0;
   private retreating = false;
+  private suppressionMs = 0;
 
   private triggerListeners: DisasterListener[] = [];
   private spawnScrollListeners: DisasterListener[] = [];
@@ -41,9 +42,14 @@ export class DisasterSystem {
   }
 
   public tick(deltaMs: number, progress01: number): void {
+    if (this.suppressionMs > 0) {
+      this.suppressionMs = Math.max(0, this.suppressionMs - deltaMs);
+    }
+
     if (this.currentWave >= this.config.triggerPoints.length) return;
 
     if (!this.triggered) {
+      if (this.suppressionMs > 0) return;
       if (progress01 >= this.config.triggerPoints[this.currentWave]) {
         this.trigger();
       }
@@ -102,6 +108,11 @@ export class DisasterSystem {
 
   public get speedBonus(): number {
     return this.isActive ? this.config.speedBonus : 0;
+  }
+
+  public suppressFor(durationMs: number): void {
+    this.suppressionMs = Math.max(this.suppressionMs, durationMs);
+    if (this.isActive) this.resolve();
   }
 
   public onTrigger(l: DisasterListener): void {

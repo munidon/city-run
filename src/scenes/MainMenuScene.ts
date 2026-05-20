@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
-import { AssetKey } from "@/assets";
+import { AssetKey, SoundKey } from "@/assets";
 import { RunState } from "@/state/RunState";
 import { makeButton } from "@/ui/button";
 
@@ -23,13 +23,14 @@ export class MainMenuScene extends Phaser.Scene {
       cx,
       cy + 170,
       "▶  게임 시작",
-      () => this.scene.start("GameScene", { run: new RunState() }),
+      () => this.startGame(false),
       {
         width: 300,
         height: 64,
         bgColor: 0x2d6a4f,
         fontSize: "28px",
         textColor: "#d8f3dc",
+        soundKey: SoundKey.GameStart,
       }
     );
 
@@ -48,11 +49,27 @@ export class MainMenuScene extends Phaser.Scene {
       }
     );
 
-    this.input.keyboard?.on("keydown-SPACE", () =>
-      this.scene.start("GameScene", { run: new RunState() })
+    makeButton(
+      this,
+      cx,
+      cy + 320,
+      "🛠  맵 에디터",
+      () => this.scene.start("MapEditorScene"),
+      {
+        width: 300,
+        height: 44,
+        bgColor: 0x312a5a,
+        fontSize: "22px",
+        textColor: "#b6aafc",
+      }
     );
-    this.input.keyboard?.on("keydown-ENTER", () =>
-      this.scene.start("GameScene", { run: new RunState() })
-    );
+
+    this.input.keyboard?.on("keydown-SPACE", () => this.startGame());
+    this.input.keyboard?.on("keydown-ENTER", () => this.startGame());
+  }
+
+  private startGame(playSound = true): void {
+    if (playSound) this.sound.play(SoundKey.GameStart);
+    this.scene.start("GameScene", { run: new RunState() });
   }
 }

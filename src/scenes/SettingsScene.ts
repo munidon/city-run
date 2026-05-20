@@ -1,5 +1,7 @@
 import * as Phaser from "phaser";
+import { SoundKey } from "@/assets";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
+import { getBgmVolume, setBgmVolume } from "@/settings";
 import { makeButton } from "@/ui/button";
 
 const FONT = "'Ramche', system-ui, sans-serif";
@@ -23,11 +25,26 @@ const LICENSE_TEXT = [
   "TypeScript 6",
   "  © Microsoft Corporation",
   "  Apache-2.0 License  |  typescriptlang.org",
+  "",
+  "── Sound Effects ─────────────────────────────────────",
+  "",
+  "8-bit / 16-bit Sound Effects (x25) Pack",
+  "  Author: JDWasabi",
+  "",
+  "200 Free SFX",
+  "  Author: Kronbits",
 ].join("\n");
+const LICENSE_LINES = LICENSE_TEXT.split("\n");
 
 export class SettingsScene extends Phaser.Scene {
+  private returnScene?: string;
+
   constructor() {
     super("SettingsScene");
+  }
+
+  init(data: { returnScene?: string } = {}): void {
+    this.returnScene = data.returnScene;
   }
 
   create(): void {
@@ -47,7 +64,7 @@ export class SettingsScene extends Phaser.Scene {
 
     this.add.rectangle(cx, 140, GAME_WIDTH - 200, 1, 0x334466);
 
-    makeButton(this, 80, 55, "← 뒤로", () => this.scene.start("MainMenuScene"), {
+    makeButton(this, 80, 55, "← 뒤로", () => this.goBack(), {
       width: 130,
       height: 42,
       bgColor: 0x1a1a30,
@@ -55,22 +72,15 @@ export class SettingsScene extends Phaser.Scene {
       textColor: "#7777aa",
     });
 
-    makeButton(this, cx, cy - 40, "에셋 미리보기", () => this.scene.start("AssetPreviewScene"), {
+    this.createVolumeSlider(cx, cy - 80);
+
+    makeButton(this, cx, cy + 30, "에셋 미리보기", () => this.scene.start("AssetPreviewScene"), {
       width: 200,
       height: 50,
       bgColor: 0x2a3a5a,
       fontSize: "22px",
       textColor: "#ffffff",
     });
-
-    // placeholder area
-    this.add
-      .text(cx, cy + 40, "추가 설정 항목은 업데이트 예정입니다", {
-        fontFamily: FONT,
-        fontSize: "18px",
-        color: "#333355",
-      })
-      .setOrigin(0.5);
 
     this.add.rectangle(cx, GAME_HEIGHT - 64, GAME_WIDTH - 200, 1, 0x222244);
 
@@ -88,6 +98,83 @@ export class SettingsScene extends Phaser.Scene {
         textColor: "#444466",
       }
     );
+  }
+
+  private goBack(): void {
+    if (this.returnScene) {
+      const sceneKey = this.returnScene;
+      this.returnScene = undefined;
+      this.scene.stop();
+      this.scene.bringToTop(sceneKey);
+      return;
+    }
+
+    this.scene.start("MainMenuScene");
+  }
+
+  private createVolumeSlider(cx: number, y: number): void {
+    const trackW = 360;
+    const trackH = 12;
+    let dragging = false;
+
+    this.add
+      .text(cx, y - 44, "배경음", {
+        fontFamily: FONT,
+        fontSize: "24px",
+        color: "#ccccff",
+      })
+      .setOrigin(0.5);
+
+    const track = this.add
+      .rectangle(cx, y, trackW, trackH, 0x242448)
+      .setStrokeStyle(1, 0x565690)
+      .setInteractive({ useHandCursor: true });
+
+    const fill = this.add
+      .rectangle(cx - trackW / 2, y, 1, trackH, 0x4dabff)
+      .setOrigin(0, 0.5);
+
+    const knob = this.add
+      .circle(cx - trackW / 2, y, 15, 0xffffff)
+      .setStrokeStyle(3, 0x4dabff)
+      .setInteractive({ useHandCursor: true });
+
+    const valueText = this.add
+      .text(cx, y + 38, "", {
+        fontFamily: FONT,
+        fontSize: "18px",
+        color: "#aaaacc",
+      })
+      .setOrigin(0.5);
+
+    const apply = (value: number) => {
+      const volume = setBgmVolume(value);
+      this.sound.setVolume(volume);
+      fill.setDisplaySize(Math.max(1, trackW * volume), trackH);
+      knob.setX(cx - trackW / 2 + trackW * volume);
+      valueText.setText(`${Math.round(volume * 100)}%`);
+    };
+
+    const updateFromX = (x: number) => {
+      apply((x - (cx - trackW / 2)) / trackW);
+    };
+
+    track.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      dragging = true;
+      updateFromX(pointer.x);
+    });
+    knob.on("pointerdown", () => {
+      dragging = true;
+    });
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
+      if (!dragging) return;
+      updateFromX(pointer.x);
+    });
+    this.input.on(Phaser.Input.Events.POINTER_UP, () => {
+      dragging = false;
+    });
+
+    apply(getBgmVolume());
   }
 
   private openLicenseModal(): void {
@@ -121,13 +208,74 @@ export class SettingsScene extends Phaser.Scene {
       0x334466
     );
 
+    const contentX = cx - PW / 2 + 44;
+    const contentY = cy - PH / 2 + 94;
+    const contentW = PW - 108;
+    const contentH = PH - 184;
     const licenseTxt = this.add
-      .text(cx - PW / 2 + 44, cy - PH / 2 + 90, LICENSE_TEXT, {
+      .text(contentX, contentY, "", {
         fontFamily: FONT,
         fontSize: "14px",
         color: "#8888aa",
         lineSpacing: 5,
+        wordWrap: { width: contentW - 28 },
       });
+    const visibleLineCount = Math.max(1, Math.floor(contentH / 22));
+    const maxScroll = Math.max(0, LICENSE_LINES.length - visibleLineCount);
+    let scrollLine = 0;
+    let draggingThumb = false;
+    let dragStartY = 0;
+    let dragStartScrollLine = 0;
+
+    const scrollTrack = this.add
+      .rectangle(contentX + contentW - 10, contentY, 5, contentH, 0x242448, 0.9)
+      .setOrigin(0.5, 0)
+      .setInteractive({ useHandCursor: maxScroll > 0 });
+    const thumbH = maxScroll > 0 ? Math.max(34, (visibleLineCount / LICENSE_LINES.length) * contentH) : contentH;
+    const scrollThumb = this.add
+      .rectangle(contentX + contentW - 10, contentY, 10, thumbH, 0x4dabff, maxScroll > 0 ? 0.92 : 0.22)
+      .setOrigin(0.5, 0)
+      .setInteractive({ useHandCursor: maxScroll > 0 });
+
+    const applyScroll = (value: number) => {
+      scrollLine = Math.round(Phaser.Math.Clamp(value, 0, maxScroll));
+      licenseTxt.setText(LICENSE_LINES.slice(scrollLine, scrollLine + visibleLineCount).join("\n"));
+      const travel = Math.max(0, contentH - scrollThumb.height);
+      const ratio = maxScroll > 0 ? scrollLine / maxScroll : 0;
+      scrollThumb.setY(contentY + travel * ratio);
+    };
+    const scrollBy = (delta: number) => applyScroll(scrollLine + delta);
+    const wheelHandler = (
+      _pointer: Phaser.Input.Pointer,
+      _targets: unknown,
+      _dx: number,
+      dy: number,
+    ) => {
+      scrollBy(dy / 60);
+    };
+    const moveHandler = (pointer: Phaser.Input.Pointer) => {
+      if (!draggingThumb || maxScroll <= 0) return;
+      const travel = Math.max(1, contentH - scrollThumb.height);
+      applyScroll(dragStartScrollLine + ((pointer.y - dragStartY) / travel) * maxScroll);
+    };
+    const upHandler = () => {
+      draggingThumb = false;
+    };
+
+    scrollTrack.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (maxScroll <= 0) return;
+      applyScroll(((pointer.y - contentY) / contentH) * maxScroll);
+    });
+    scrollThumb.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (maxScroll <= 0) return;
+      draggingThumb = true;
+      dragStartY = pointer.y;
+      dragStartScrollLine = scrollLine;
+    });
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, wheelHandler);
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, moveHandler);
+    this.input.on(Phaser.Input.Events.POINTER_UP, upHandler);
+    applyScroll(0);
 
     const closeBg = this.add
       .rectangle(cx, cy + PH / 2 - 32, 130, 40, 0x1e1e44)
@@ -140,11 +288,29 @@ export class SettingsScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const all = [dim, panel, titleTxt, divider, licenseTxt, closeBg, closeTxt];
-    const closeAll = () => all.forEach((o) => o.destroy());
+    const all = [
+      dim,
+      panel,
+      titleTxt,
+      divider,
+      licenseTxt,
+      scrollTrack,
+      scrollThumb,
+      closeBg,
+      closeTxt,
+    ];
+    const closeAll = () => {
+      this.input.off(Phaser.Input.Events.POINTER_WHEEL, wheelHandler);
+      this.input.off(Phaser.Input.Events.POINTER_MOVE, moveHandler);
+      this.input.off(Phaser.Input.Events.POINTER_UP, upHandler);
+      all.forEach((o) => o.destroy());
+    };
 
     closeBg.on("pointerover", () => closeBg.setAlpha(0.65));
     closeBg.on("pointerout", () => closeBg.setAlpha(1));
-    closeBg.on("pointerup", closeAll);
+    closeBg.on("pointerup", () => {
+      this.sound.play(SoundKey.Settings);
+      closeAll();
+    });
   }
 }

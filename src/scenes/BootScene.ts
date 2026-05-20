@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { GAME_ATLAS_ASSETS, GAME_IMAGE_ASSETS } from "@/assets";
+import { GAME_ATLAS_ASSETS, GAME_AUDIO_ASSETS, GAME_IMAGE_ASSETS } from "@/assets";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 
 export class BootScene extends Phaser.Scene {
@@ -14,6 +14,10 @@ export class BootScene extends Phaser.Scene {
 
     for (const asset of GAME_IMAGE_ASSETS) {
       this.load.image(asset.key, asset.path);
+    }
+
+    for (const asset of GAME_AUDIO_ASSETS) {
+      this.load.audio(asset.key, asset.path);
     }
   }
 

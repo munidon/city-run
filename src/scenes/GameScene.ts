@@ -1,9 +1,10 @@
 import * as Phaser from "phaser";
-import { AssetKey } from "@/assets";
+import { AssetKey, SoundKey } from "@/assets";
 import { BASE_SPEED, GAME_HEIGHT, GAME_WIDTH, GROUND_HEIGHT, GROUND_Y, PLAYER_X } from "@/config";
 import { Player } from "@/objects/Player";
 import { Obstacle } from "@/objects/Obstacle";
 import { Item } from "@/objects/Item";
+import { Platform } from "@/objects/Platform";
 import { Scroll } from "@/objects/Scroll";
 import { ChaseShadow } from "@/objects/ChaseShadow";
 import { HealthSystem } from "@/systems/HealthSystem";
@@ -11,13 +12,21 @@ import { StageSystem } from "@/systems/StageSystem";
 import { ObstacleSpawner } from "@/systems/ObstacleSpawner";
 import { ItemSpawner } from "@/systems/ItemSpawner";
 import { DisasterSystem } from "@/systems/DisasterSystem";
+import { SegmentManager } from "@/systems/SegmentManager";
+import { MapSegment } from "@/data/segments";
+import { getBgmVolume } from "@/settings";
 import { HUD } from "@/ui/HUD";
 import { QuizModal } from "@/ui/QuizModal";
 import { pickRandomQuiz } from "@/data/quizzes";
 import { RunState } from "@/state/RunState";
+import { makeButton } from "@/ui/button";
 
 const COLLISION_IFRAMES_MS = 700;
 const QUIZ_BONUS_COINS = 50;
+const ENERGY_BOOST_DURATION_MS = 5000;
+const ENERGY_SPEED_MULTIPLIER = 2;
+const ENERGY_PARTICLE_KEY = "__energy_boost_particle";
+const PAUSE_DEPTH = 1900;
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -27,11 +36,14 @@ export class GameScene extends Phaser.Scene {
   private obstacles!: ObstacleSpawner;
   private items!: ItemSpawner;
   private disaster!: DisasterSystem;
+  private segments!: SegmentManager;
+  private testSegment?: MapSegment;
 
   private bgFar!: Phaser.GameObjects.TileSprite;
   private bgNear!: Phaser.GameObjects.TileSprite;
   private ground!: Phaser.GameObjects.TileSprite;
   private groundBody!: Phaser.Physics.Arcade.StaticBody;
+  private bgm?: Phaser.Sound.BaseSound;
 
   private gameOver = false;
   private cleared = false;
@@ -43,6 +55,17 @@ export class GameScene extends Phaser.Scene {
   private chase?: ChaseShadow;
   private run!: RunState;
   private stageCoinDelta = 0;
+  private energyBoostUntil = 0;
+  private energyStatusTimer?: Phaser.Time.TimerEvent;
+  private energyBoostEmitter?: Phaser.GameObjects.Particles.ParticleEmitter;
+  private usedQuizIds = new Set<string>();
+  private isGamePaused = false;
+  private pauseButton?: Phaser.GameObjects.Container;
+  private pauseOverlay?: Phaser.GameObjects.Container;
+  private confirmOverlay?: Phaser.GameObjects.Container;
+  private countdownText?: Phaser.GameObjects.Text;
+  private resumeCountdownTimer?: number;
+  private pausedRealAt = 0;
 
   // 배경 이미지 전체를 위아래로 조절하여 캐릭터의 발(GROUND_Y)에 맞추기 위한 변수 (양수: 위로 이동, 음수: 아래로 이동)
   private readonly bgOffsetY = 0;
@@ -51,8 +74,9 @@ export class GameScene extends Phaser.Scene {
     super("GameScene");
   }
 
-  init(data: { run?: RunState }): void {
+  init(data: { run?: RunState; testSegment?: MapSegment }): void {
     this.run = data?.run ?? new RunState();
+    this.testSegment = data?.testSegment;
   }
 
   create(): void {
@@ -63,6 +87,20 @@ export class GameScene extends Phaser.Scene {
     this.stageCoinDelta = 0;
     this.iframesUntil = 0;
     this.quizActive = false;
+    this.energyBoostUntil = 0;
+    this.energyStatusTimer?.remove(false);
+    this.energyStatusTimer = undefined;
+    this.energyBoostEmitter?.destroy();
+    this.energyBoostEmitter = undefined;
+    this.usedQuizIds.clear();
+    this.isGamePaused = false;
+    this.clearResumeCountdown();
+    this.pauseOverlay?.destroy();
+    this.pauseOverlay = undefined;
+    this.confirmOverlay?.destroy();
+    this.confirmOverlay = undefined;
+    this.countdownText?.destroy();
+    this.countdownText = undefined;
 
     this.createBackground();
     this.createGround();
@@ -86,13 +124,32 @@ export class GameScene extends Phaser.Scene {
       () => this.currentSpeed(),
       this.run.obstacleDensityMul,
     );
-    this.items = new ItemSpawner(this, () => this.currentSpeed());
+    this.items = new ItemSpawner(
+      this,
+      () => this.currentSpeed(),
+      () => this.disaster.hasChase,
+    );
+
+    this.segments = new SegmentManager(
+      this,
+      () => this.currentSpeed(),
+      () => this.stage.progress,
+    );
+    if (this.testSegment) this.segments.setForcedSegment(this.testSegment);
 
     this.physics.add.collider(this.obstacles.group, this.groundBody);
+    this.physics.add.collider(
+      this.player,
+      this.segments.platformGroup,
+      undefined,
+      this.canLandOnPlatform,
+      this,
+    );
 
     this.physics.add.overlap(this.player, this.obstacles.group, this.handleObstacleHit, undefined, this);
     this.physics.add.overlap(this.player, this.items.itemGroup, this.handleItemPickup, undefined, this);
     this.physics.add.overlap(this.player, this.items.scrollGroup, this.handleScrollPickup, undefined, this);
+    this.physics.add.overlap(this.player, this.segments.coinGroup, this.handleItemPickup, undefined, this);
 
     this.hud = new HUD(this);
     this.health.onChange((cur, max) => this.hud.setHealth(cur, max));
@@ -100,10 +157,13 @@ export class GameScene extends Phaser.Scene {
     this.stage.onCheckpoint((cp) => this.handleCheckpoint(cp));
     this.hud.setStageLabel(`Stage 1-${this.run.stageIndex}`);
     this.hud.setCoins(this.run.totalCoins);
+    this.createPauseButton();
 
     this.disaster.onTrigger(() => {
+      this.sound.play(SoundKey.DisasterAppear);
       this.hud.setDisasterStatus("⚠ 재난 출현 — 두루마리를 찾아라!");
       this.cameras.main.shake(400, 0.005);
+      this.items.removeItemsByKind("energy_drink");
       this.chase?.destroy();
       this.chase = new ChaseShadow(this);
     });
@@ -113,7 +173,10 @@ export class GameScene extends Phaser.Scene {
     });
     this.disaster.onResolve(() => {
       this.hud.setDisasterStatus("✓ 재난 해소");
-      this.time.delayedCall(1500, () => this.hud.setDisasterStatus(""));
+      this.time.delayedCall(1500, () => {
+        if (this.isEnergyBoostActive()) return;
+        this.hud.setDisasterStatus("");
+      });
       this.chase?.hide();
       this.chase = undefined;
     });
@@ -122,20 +185,29 @@ export class GameScene extends Phaser.Scene {
 
     this.createMobileUI();
 
+    this.sound.setVolume(getBgmVolume());
+    this.bgm = this.sound.add(SoundKey.Bgm, { loop: true, volume: 1 });
+    this.bgm.play();
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.clearResumeCountdown();
       this.teardownInput();
+      this.energyBoostEmitter?.destroy();
       this.quiz?.destroy();
+      this.pauseButton?.destroy();
+      this.bgm?.stop();
+      this.bgm?.destroy();
     });
   }
 
   override update(_time: number, delta: number): void {
-    if (this.gameOver || this.cleared || this.quizActive) return;
+    if (this.gameOver || this.cleared || this.quizActive || this.isGamePaused) return;
 
     this.elapsedSec += delta / 1000;
     this.hud.setElapsed(this.elapsedSec);
 
     this.health.tick(delta);
-    this.stage.tick(delta);
+    this.stage.tick(delta * this.progressSpeedMultiplier());
     this.disaster.tick(delta, this.stage.progress);
 
     const speed = this.currentSpeed();
@@ -145,6 +217,7 @@ export class GameScene extends Phaser.Scene {
 
     this.obstacles.update(delta);
     this.items.update(delta);
+    this.segments.update(delta);
 
     if (this.chase) {
       this.chase.setX(this.disaster.chasePosition);
@@ -161,13 +234,14 @@ export class GameScene extends Phaser.Scene {
       const fireRightEdge = this.disaster.chasePosition + FIRE_OFFSET;
 
       // 불길의 오른쪽 끝이 플레이어의 오른쪽 끝을 완전히 덮치면 사망
-      if (fireRightEdge >= playerRightEdge && !this.disaster.hasResolved) {
+      if (fireRightEdge >= playerRightEdge && !this.disaster.hasResolved && !this.isEnergyBoostActive()) {
         this.handleChaseCaught();
         return;
       }
     }
 
     this.player.update();
+    this.updateEnergyBoostParticles();
 
     if (this.health.isDead) this.handleDeath();
     else if (this.stage.complete) this.handleClear();
@@ -175,18 +249,41 @@ export class GameScene extends Phaser.Scene {
 
   private currentSpeed(): number {
     const stageBoost = 1 + (this.run.stageIndex - 1) * 0.07;
-    return BASE_SPEED * this.stage.speedMultiplier * (1 + this.disaster.speedBonus) * stageBoost;
+    return (
+      BASE_SPEED *
+      this.stage.speedMultiplier *
+      (1 + this.disaster.speedBonus) *
+      stageBoost *
+      this.progressSpeedMultiplier()
+    );
+  }
+
+  private progressSpeedMultiplier(): number {
+    return this.isEnergyBoostActive() ? ENERGY_SPEED_MULTIPLIER : 1;
+  }
+
+  private isEnergyBoostActive(): boolean {
+    return this.time.now < this.energyBoostUntil;
   }
 
   private handleObstacleHit(_player: unknown, obstacleObj: unknown): void {
     const obs = obstacleObj as Obstacle;
     if (obs.consumed) return;
+
+    if (this.isEnergyBoostActive()) {
+      obs.consumed = true;
+      this.launchObstacle(obs);
+      return;
+    }
+
     if (this.time.now < this.iframesUntil) return;
 
     obs.consumed = true;
     this.iframesUntil = this.time.now + COLLISION_IFRAMES_MS;
+    const supportY = this.findCurrentPlatformSupportY();
     this.health.damage(obs.damagePct);
     this.player.playHit();
+    if (supportY !== null) this.player.snapToSupport(supportY);
     this.flashHit();
     this.cameras.main.shake(120, 0.006);
 
@@ -208,6 +305,9 @@ export class GameScene extends Phaser.Scene {
       const heal = item.healPct * this.run.healMul * this.run.pendingRewardMul;
       this.health.heal(heal);
     }
+    if (item.kind === "energy_drink") {
+      this.activateEnergyBoost();
+    }
     if (item.coins > 0) {
       const coinMul = this.run.coinMul * this.run.pendingRewardMul * (this.run.pendingDoubleCoin ? 2 : 1);
       const earned = Math.round(item.coins * coinMul);
@@ -225,6 +325,94 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private activateEnergyBoost(): void {
+    this.energyBoostUntil = Math.max(this.energyBoostUntil, this.time.now + ENERGY_BOOST_DURATION_MS);
+    this.iframesUntil = Math.max(this.iframesUntil, this.energyBoostUntil);
+    this.disaster.suppressFor(ENERGY_BOOST_DURATION_MS);
+    this.hud.setDisasterStatus("⚡ 에너지 드링크: 5초 무적 질주");
+    this.startEnergyBoostParticles();
+
+    this.energyStatusTimer?.remove(false);
+    this.energyStatusTimer = this.time.delayedCall(ENERGY_BOOST_DURATION_MS, () => {
+      if (this.isEnergyBoostActive()) {
+        this.energyStatusTimer = this.time.delayedCall(this.energyBoostUntil - this.time.now, () => {
+          this.stopEnergyBoostParticles();
+          if (!this.disaster.isActive) this.hud.setDisasterStatus("");
+          this.energyStatusTimer = undefined;
+        });
+        return;
+      }
+      this.stopEnergyBoostParticles();
+      if (!this.disaster.isActive) this.hud.setDisasterStatus("");
+      this.energyStatusTimer = undefined;
+    });
+  }
+
+  private ensureEnergyParticleTexture(): string {
+    if (this.textures.exists(ENERGY_PARTICLE_KEY)) return ENERGY_PARTICLE_KEY;
+
+    const g = this.add.graphics({ x: 0, y: 0 });
+    g.fillStyle(0xfff14a, 1);
+    g.fillCircle(8, 8, 8);
+    g.fillStyle(0xffffff, 0.75);
+    g.fillCircle(6, 6, 3);
+    g.generateTexture(ENERGY_PARTICLE_KEY, 16, 16);
+    g.destroy();
+    return ENERGY_PARTICLE_KEY;
+  }
+
+  private startEnergyBoostParticles(): void {
+    if (!this.energyBoostEmitter) {
+      this.energyBoostEmitter = this.add
+        .particles(0, 0, this.ensureEnergyParticleTexture(), {
+          lifespan: { min: 220, max: 420 },
+          speedX: { min: -230, max: -90 },
+          speedY: { min: -70, max: 70 },
+          scale: { start: 0.72, end: 0 },
+          alpha: { start: 0.95, end: 0 },
+          tint: 0xffd84d,
+          quantity: 3,
+          frequency: 28,
+          blendMode: Phaser.BlendModes.ADD,
+          maxAliveParticles: 90,
+          emitting: false,
+        })
+        .setDepth(69);
+    }
+
+    this.updateEnergyBoostParticles();
+    this.energyBoostEmitter.resume();
+    this.energyBoostEmitter.start();
+  }
+
+  private stopEnergyBoostParticles(kill = false): void {
+    this.energyBoostEmitter?.stop(kill);
+  }
+
+  private updateEnergyBoostParticles(): void {
+    if (!this.energyBoostEmitter || !this.isEnergyBoostActive()) return;
+    const verticalOffset = this.player.sliding ? -38 : -66;
+    this.energyBoostEmitter.setPosition(this.player.x - 48, this.player.y + verticalOffset);
+  }
+
+  private launchObstacle(obs: Obstacle): void {
+    obs.setData("launched", true);
+    const body = obs.body as Phaser.Physics.Arcade.Body | null;
+    body?.setVelocity(0, 0);
+    body?.setEnable(false);
+    obs.setTint(0xfff3a3);
+    this.tweens.add({
+      targets: obs,
+      x: obs.x + Phaser.Math.Between(220, 360),
+      y: obs.y - Phaser.Math.Between(120, 220),
+      angle: obs.angle + Phaser.Math.Between(220, 420),
+      alpha: 0,
+      duration: 450,
+      ease: "Cubic.easeOut",
+      onComplete: () => obs.destroy(),
+    });
+  }
+
   private handleScrollPickup(_player: unknown, scrollObj: unknown): void {
     const scroll = scrollObj as Scroll;
     if (scroll.consumed || this.quizActive) return;
@@ -238,8 +426,10 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.pause();
     this.obstacles.pause(true);
     this.items.pause(true);
+    this.segments.pause(true);
 
-    const question = pickRandomQuiz();
+    const question = pickRandomQuiz(undefined, this.usedQuizIds);
+    this.usedQuizIds.add(question.id);
     this.quiz = new QuizModal(this, question, (result) => {
       this.quiz = undefined;
       if (result === "correct") {
@@ -253,6 +443,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.world.resume();
       this.obstacles.pause(false);
       this.items.pause(false);
+      this.segments.pause(false);
       this.quizActive = false;
     });
   }
@@ -354,7 +545,7 @@ export class GameScene extends Phaser.Scene {
     kb?.on("keydown-S", this.trySlide, this);
     kb?.on("keyup-DOWN", this.tryEndSlide, this);
     kb?.on("keyup-S", this.tryEndSlide, this);
-    kb?.on("keydown-ESC", this.returnToMenu, this);
+    kb?.on("keydown-ESC", this.openPauseMenu, this);
     kb?.on("keydown-R", this.restart, this);
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
   }
@@ -368,28 +559,28 @@ export class GameScene extends Phaser.Scene {
     kb?.off("keydown-S", this.trySlide, this);
     kb?.off("keyup-DOWN", this.tryEndSlide, this);
     kb?.off("keyup-S", this.tryEndSlide, this);
-    kb?.off("keydown-ESC", this.returnToMenu, this);
+    kb?.off("keydown-ESC", this.openPauseMenu, this);
     kb?.off("keydown-R", this.restart, this);
     this.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
   }
 
   private tryJump(): void {
-    if (this.gameOver || this.cleared || this.quizActive) return;
+    if (this.gameOver || this.cleared || this.quizActive || this.isGamePaused) return;
     this.player.jump();
   }
 
   private trySlide(): void {
-    if (this.gameOver || this.cleared || this.quizActive) return;
+    if (this.gameOver || this.cleared || this.quizActive || this.isGamePaused) return;
     this.player.slide();
   }
 
   private tryEndSlide(): void {
-    if (this.gameOver || this.cleared || this.quizActive) return;
+    if (this.gameOver || this.cleared || this.quizActive || this.isGamePaused) return;
     this.player.endSlide();
   }
 
   private onPointerDown(_p: Phaser.Input.Pointer): void {
-    if (this.quizActive) return;
+    if (this.quizActive || this.isGamePaused) return;
     if (this.cleared) return;
     if (this.gameOver) {
       this.restart();
@@ -397,8 +588,253 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private canLandOnPlatform(playerObj: unknown, platformObj: unknown): boolean {
+    const player = playerObj as Player;
+    const platform = platformObj as Platform;
+    const playerBody = player.body as Phaser.Physics.Arcade.Body | null;
+    const platformBody = platform.body as Phaser.Physics.Arcade.Body | null;
+    if (!playerBody || !platformBody) return false;
+    if (playerBody.velocity.y < 0) return false;
+
+    const previousBottom = playerBody.bottom - playerBody.deltaY();
+    return previousBottom <= platformBody.top + 8;
+  }
+
+  private findCurrentPlatformSupportY(): number | null {
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
+    if (!playerBody) return null;
+
+    let supportY: number | null = null;
+    for (const child of this.segments.platformGroup.getChildren()) {
+      const platform = child as Platform;
+      const platformBody = platform.body as Phaser.Physics.Arcade.Body | null;
+      if (!platform.active || !platformBody) continue;
+
+      const overlapsX = playerBody.right > platformBody.left + 4 && playerBody.left < platformBody.right - 4;
+      const standingOnTop = playerBody.bottom >= platformBody.top - 6 && playerBody.bottom <= platformBody.top + 18;
+      if (!overlapsX || !standingOnTop) continue;
+      if (supportY === null || platformBody.top < supportY) supportY = platformBody.top;
+    }
+
+    return supportY;
+  }
+
+  private createPauseButton(): void {
+    const x = GAME_WIDTH - 112;
+    const y = 36;
+    const bg = this.add
+      .rectangle(0, 0, 44, 38, 0x111128, 0.72)
+      .setStrokeStyle(1, 0xffffff, 0.35)
+      .setInteractive({ useHandCursor: true });
+    const icon = this.add
+      .text(0, -1, "Ⅱ", {
+        fontFamily: "'Ramche', system-ui, sans-serif",
+        fontSize: "23px",
+        color: "#ffffff",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+
+    this.pauseButton = this.add.container(x, y, [bg, icon]).setScrollFactor(0).setDepth(1200);
+    bg.on("pointerover", () => bg.setAlpha(0.55));
+    bg.on("pointerout", () => bg.setAlpha(1));
+    bg.on("pointerup", () => {
+      this.sound.play(SoundKey.Settings);
+      this.openPauseMenu();
+    });
+  }
+
+  private openPauseMenu(): void {
+    if (this.gameOver || this.cleared || this.quizActive || this.isGamePaused) return;
+
+    this.isGamePaused = true;
+    this.pausedRealAt = performance.now();
+    this.freezeGameplay();
+    this.showPauseOverlay();
+  }
+
+  private freezeGameplay(): void {
+    this.physics.world.pause();
+    this.obstacles.pause(true);
+    this.items.pause(true);
+    this.segments.pause(true);
+    this.tweens.pauseAll();
+    this.time.paused = true;
+    this.energyBoostEmitter?.pause();
+  }
+
+  private startResumeCountdown(): void {
+    this.confirmOverlay?.destroy();
+    this.confirmOverlay = undefined;
+    this.pauseOverlay?.destroy();
+    this.pauseOverlay = undefined;
+
+    let count = 3;
+    this.countdownText = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, String(count), {
+        fontFamily: "'Ramche', system-ui, sans-serif",
+        fontSize: "108px",
+        color: "#ffffff",
+        fontStyle: "bold",
+        stroke: "#111128",
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(PAUSE_DEPTH + 40);
+
+    this.clearResumeCountdown();
+    this.resumeCountdownTimer = window.setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        this.countdownText?.setText(String(count));
+        return;
+      }
+      this.clearResumeCountdown();
+      this.countdownText?.destroy();
+      this.countdownText = undefined;
+      this.resumeGameplay();
+    }, 1000);
+  }
+
+  private resumeGameplay(): void {
+    const pausedDurationMs = Math.max(0, performance.now() - this.pausedRealAt);
+    this.energyBoostUntil += pausedDurationMs;
+    this.iframesUntil += pausedDurationMs;
+    this.time.paused = false;
+    this.tweens.resumeAll();
+    this.physics.world.resume();
+    this.obstacles.pause(false);
+    this.items.pause(false);
+    this.segments.pause(false);
+    this.isGamePaused = false;
+    if (this.isEnergyBoostActive()) this.startEnergyBoostParticles();
+  }
+
+  private showPauseOverlay(): void {
+    this.pauseOverlay?.destroy();
+
+    const dim = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.45)
+      .setScrollFactor(0)
+      .setInteractive();
+    const title = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 134, "일시정지", {
+        fontFamily: "'Ramche', system-ui, sans-serif",
+        fontSize: "52px",
+        color: "#ffffff",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    const resume = makeButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "게임 재개", () => {
+      this.startResumeCountdown();
+    }, {
+      width: 260,
+      height: 56,
+      bgColor: 0x2d6a4f,
+      fontSize: "24px",
+      textColor: "#d8f3dc",
+      soundKey: SoundKey.GameStart,
+    });
+    const quit = makeButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 34, "게임 나가기", () => {
+      this.showQuitConfirm();
+    }, {
+      width: 260,
+      height: 56,
+      bgColor: 0x5a2a2a,
+      fontSize: "24px",
+      textColor: "#ffd8d8",
+      soundKey: SoundKey.Exit,
+    });
+    const settings = makeButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 108, "설정", () => {
+      this.openSettingsFromPause();
+    }, {
+      width: 260,
+      height: 56,
+      bgColor: 0x2a3a5a,
+      fontSize: "24px",
+      textColor: "#ffffff",
+    });
+
+    this.pauseOverlay = this.add
+      .container(0, 0, [dim, title, resume, quit, settings])
+      .setScrollFactor(0)
+      .setDepth(PAUSE_DEPTH);
+  }
+
+  private showQuitConfirm(): void {
+    this.confirmOverlay?.destroy();
+
+    const dim = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.62)
+      .setScrollFactor(0)
+      .setInteractive();
+    const panel = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 560, 260, 0x111128, 0.96)
+      .setStrokeStyle(1, 0xffffff, 0.25)
+      .setScrollFactor(0);
+    const msg = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 52, "정말 나가시겠습니까?\n진행 상황은 저장되지 않습니다.", {
+        fontFamily: "'Ramche', system-ui, sans-serif",
+        fontSize: "24px",
+        color: "#ffffff",
+        align: "center",
+        lineSpacing: 10,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    const yes = makeButton(this, GAME_WIDTH / 2 - 90, GAME_HEIGHT / 2 + 68, "네", () => this.confirmQuit(), {
+      width: 140,
+      height: 50,
+      bgColor: 0x6a2d2d,
+      fontSize: "22px",
+      textColor: "#ffe0e0",
+    });
+    const no = makeButton(this, GAME_WIDTH / 2 + 90, GAME_HEIGHT / 2 + 68, "아니오", () => {
+      this.confirmOverlay?.destroy();
+      this.confirmOverlay = undefined;
+    }, {
+      width: 140,
+      height: 50,
+      bgColor: 0x2d6a4f,
+      fontSize: "22px",
+      textColor: "#d8f3dc",
+    });
+
+    this.confirmOverlay = this.add
+      .container(0, 0, [dim, panel, msg, yes, no])
+      .setScrollFactor(0)
+      .setDepth(PAUSE_DEPTH + 20);
+  }
+
+  private openSettingsFromPause(): void {
+    this.confirmOverlay?.destroy();
+    this.confirmOverlay = undefined;
+    this.scene.launch("SettingsScene", { returnScene: "GameScene" });
+    this.scene.bringToTop("SettingsScene");
+  }
+
+  private confirmQuit(): void {
+    this.clearResumeCountdown();
+    this.stopEnergyBoostParticles(true);
+    this.time.paused = false;
+    this.tweens.resumeAll();
+    this.stopBgm();
+    this.run.reset();
+    this.scene.start("MainMenuScene");
+  }
+
+  private clearResumeCountdown(): void {
+    if (this.resumeCountdownTimer === undefined) return;
+    window.clearInterval(this.resumeCountdownTimer);
+    this.resumeCountdownTimer = undefined;
+  }
+
   private handleDeath(): void {
     this.gameOver = true;
+    this.stopEnergyBoostParticles();
+    this.stopBgm();
     this.showOverlay("💀 사망", `획득 코인: ${this.coins}\n탭 또는 R: 재시작 / ESC: 메뉴`);
   }
 
@@ -417,13 +853,29 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver) return;
     this.gameOver = true;
     this.health.damage(999);
+    this.stopEnergyBoostParticles();
+    this.sound.play(SoundKey.BossHit);
     this.cameras.main.shake(600, 0.012);
     this.cameras.main.flash(400, 255, 60, 30);
+    this.stopBgm();
     this.showOverlay("🔥 재난에 휩쓸림", `획득 코인: ${this.coins}\n탭 또는 R: 재시작 / ESC: 메뉴`);
+  }
+
+  private stopBgm(): void {
+    if (!this.bgm) return;
+    this.tweens.add({
+      targets: this.bgm,
+      volume: 0,
+      duration: 800,
+      onComplete: () => this.bgm?.stop(),
+    });
   }
 
   private handleClear(): void {
     this.cleared = true;
+    this.stopEnergyBoostParticles();
+    this.sound.play(SoundKey.StageClear);
+    this.stopBgm();
     this.run.totalCoins += this.stageCoinDelta;
     this.run.consumeOneShots();
     this.showOverlay(
@@ -475,10 +927,6 @@ export class GameScene extends Phaser.Scene {
     this.scene.start("GameScene", { run: this.run });
   }
 
-  private returnToMenu(): void {
-    this.run.reset();
-    this.scene.start("MainMenuScene");
-  }
   private createMobileUI(): void {
     // 데스크탑 환경이면 버튼을 만들지 않음
     if (this.sys.game.device.os.desktop) return;
