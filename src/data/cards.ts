@@ -74,17 +74,6 @@ export const ALL_CARDS: Card[] = [
       run.pendingRewardMul *= 2;
     },
   },
-  {
-    id: "r-dense",
-    category: "risk_reward",
-    rarity: "legendary",
-    title: "장애물 +50% / 코인 x3",
-    description: "장애물 밀도 50% 증가 (영구), 코인 획득량 3배 (영구).",
-    apply: (run) => {
-      run.obstacleDensityMul *= 1.5;
-      run.coinMul *= 3;
-    },
-  },
 ];
 
 export function pickThreeCards(exclude: string[] = []): Card[] {

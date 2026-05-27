@@ -1,4 +1,6 @@
 import { GAME_WIDTH, GROUND_Y } from "@/config";
+import type { ItemKind } from "@/objects/Item";
+import type { ObstacleKind } from "@/objects/Obstacle";
 
 export interface PlatformDef {
   x: number;      // 세그먼트 내 로컬 좌표 (0 = 세그먼트 시작)
@@ -12,6 +14,18 @@ export interface CoinDef {
   y: number;
 }
 
+export interface SegmentItemDef {
+  kind: Exclude<ItemKind, "coin">;
+  x: number;
+  y: number;
+}
+
+export interface SegmentObstacleDef {
+  kind: ObstacleKind;
+  x: number;
+  y: number;
+}
+
 export interface MapSegment {
   id: string;
   length: number;             // 세그먼트 가로 길이 (px)
@@ -20,6 +34,8 @@ export interface MapSegment {
   exitGroundY: number;        // 우측 끝 지면 높이
   platforms: PlatformDef[];
   coins: CoinDef[];
+  items: SegmentItemDef[];
+  obstacles: SegmentObstacleDef[];
 }
 
 const PLATFORM_THICKNESS = 36;
@@ -38,6 +54,8 @@ export const SEGMENTS: MapSegment[] = [
       { x: 460, y: GROUND_Y - 50 },
       { x: 520, y: GROUND_Y - 50 },
     ],
+    items: [],
+    obstacles: [],
   },
   {
     id: "step-up-3",
@@ -58,6 +76,8 @@ export const SEGMENTS: MapSegment[] = [
       { x: 840, y: GROUND_Y - 160 },
       { x: 1000, y: GROUND_Y - 120 },
     ],
+    items: [],
+    obstacles: [],
   },
   {
     id: "gap-jumps",
@@ -78,6 +98,8 @@ export const SEGMENTS: MapSegment[] = [
       { x: 750, y: GROUND_Y - 180 },
       { x: 910, y: GROUND_Y - 150 },
     ],
+    items: [],
+    obstacles: [],
   },
   {
     id: "high-platform",
@@ -98,6 +120,8 @@ export const SEGMENTS: MapSegment[] = [
       { x: 740, y: GROUND_Y - 250 },
       { x: 980, y: GROUND_Y - 140 },
     ],
+    items: [],
+    obstacles: [],
   },
 ];
 

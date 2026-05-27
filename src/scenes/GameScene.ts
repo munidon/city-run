@@ -1,27 +1,33 @@
 import * as Phaser from "phaser";
 import { AssetKey, SoundKey } from "@/assets";
-import { BASE_SPEED, GAME_HEIGHT, GAME_WIDTH, GROUND_HEIGHT, GROUND_Y, PLAYER_X } from "@/config";
+import { BASE_SPEED, DESPAWN_X, GAME_HEIGHT, GAME_WIDTH, GROUND_HEIGHT, GROUND_Y, PLAYER_X, SPAWN_X } from "@/config";
 import { Player } from "@/objects/Player";
 import { Obstacle } from "@/objects/Obstacle";
 import { Item } from "@/objects/Item";
 import { Platform } from "@/objects/Platform";
 import { Scroll } from "@/objects/Scroll";
 import { ChaseShadow } from "@/objects/ChaseShadow";
+import { FloodWater } from "@/objects/FloodWater";
 import { HealthSystem } from "@/systems/HealthSystem";
 import { StageSystem } from "@/systems/StageSystem";
-import { ObstacleSpawner } from "@/systems/ObstacleSpawner";
-import { ItemSpawner } from "@/systems/ItemSpawner";
 import { DisasterSystem } from "@/systems/DisasterSystem";
 import { SegmentManager } from "@/systems/SegmentManager";
 import { MapSegment } from "@/data/segments";
 import { getBgmVolume } from "@/settings";
 import { HUD } from "@/ui/HUD";
 import { QuizModal } from "@/ui/QuizModal";
-import { pickRandomQuiz } from "@/data/quizzes";
+import { CHAPTER_1_QUIZZES, FLOOD_QUIZZES, pickRandomQuiz } from "@/data/quizzes";
+import type { QuizQuestion } from "@/data/quizzes";
 import { RunState } from "@/state/RunState";
+import { disasterForStage, disasterLabel } from "@/data/disasters";
+import type { DisasterKind } from "@/data/disasters";
 import { makeButton } from "@/ui/button";
 
 const COLLISION_IFRAMES_MS = 700;
+const CHASE_DAMAGE = 50;
+const FLOOD_DAMAGE = 10;
+const FLOOD_DAMAGE_INTERVAL_MS = 1000;
+const FLOOD_AUTO_RESOLVE_DAMAGE = 40;
 const QUIZ_BONUS_COINS = 50;
 const ENERGY_BOOST_DURATION_MS = 5000;
 const ENERGY_SPEED_MULTIPLIER = 2;
@@ -33,10 +39,9 @@ export class GameScene extends Phaser.Scene {
   private health!: HealthSystem;
   private stage!: StageSystem;
   private hud!: HUD;
-  private obstacles!: ObstacleSpawner;
-  private items!: ItemSpawner;
   private disaster!: DisasterSystem;
   private segments!: SegmentManager;
+  private scrollGroup!: Phaser.Physics.Arcade.Group;
   private testSegment?: MapSegment;
 
   private bgFar!: Phaser.GameObjects.TileSprite;
@@ -53,6 +58,7 @@ export class GameScene extends Phaser.Scene {
   private quizActive = false;
   private quiz?: QuizModal;
   private chase?: ChaseShadow;
+  private floodWater?: FloodWater;
   private run!: RunState;
   private stageCoinDelta = 0;
   private energyBoostUntil = 0;
@@ -66,6 +72,9 @@ export class GameScene extends Phaser.Scene {
   private countdownText?: Phaser.GameObjects.Text;
   private resumeCountdownTimer?: number;
   private pausedRealAt = 0;
+  private touchingFloodWater = false;
+  private nextFloodDamageAt = 0;
+  private floodDamageTaken = 0;
 
   // 배경 이미지 전체를 위아래로 조절하여 캐릭터의 발(GROUND_Y)에 맞추기 위한 변수 (양수: 위로 이동, 음수: 아래로 이동)
   private readonly bgOffsetY = 0;
@@ -87,6 +96,9 @@ export class GameScene extends Phaser.Scene {
     this.stageCoinDelta = 0;
     this.iframesUntil = 0;
     this.quizActive = false;
+    this.touchingFloodWater = false;
+    this.nextFloodDamageAt = 0;
+    this.floodDamageTaken = 0;
     this.energyBoostUntil = 0;
     this.energyStatusTimer?.remove(false);
     this.energyStatusTimer = undefined;
@@ -101,8 +113,11 @@ export class GameScene extends Phaser.Scene {
     this.confirmOverlay = undefined;
     this.countdownText?.destroy();
     this.countdownText = undefined;
+    this.floodWater?.destroy();
+    this.floodWater = undefined;
+    const disasterKind = disasterForStage(this.run.stageIndex);
 
-    this.createBackground();
+    this.createBackground(disasterKind);
     this.createGround();
 
     this.player = new Player(this, PLAYER_X, GROUND_Y);
@@ -116,19 +131,10 @@ export class GameScene extends Phaser.Scene {
       this.health.damage(maxHp * (1 - this.run.pendingStartHpRatio));
     }
     this.stage = new StageSystem();
-    this.disaster = new DisasterSystem();
-
-    this.obstacles = new ObstacleSpawner(
-      this,
-      () => this.stage.progress,
-      () => this.currentSpeed(),
-      this.run.obstacleDensityMul,
-    );
-    this.items = new ItemSpawner(
-      this,
-      () => this.currentSpeed(),
-      () => this.disaster.hasChase,
-    );
+    this.disaster = new DisasterSystem(disasterKind);
+    if (disasterKind === "flood") {
+      this.floodWater = new FloodWater(this);
+    }
 
     this.segments = new SegmentManager(
       this,
@@ -136,43 +142,46 @@ export class GameScene extends Phaser.Scene {
       () => this.stage.progress,
     );
     if (this.testSegment) this.segments.setForcedSegment(this.testSegment);
+    this.scrollGroup = this.physics.add.group({ classType: Scroll, runChildUpdate: false, allowGravity: false });
 
-    this.physics.add.collider(this.obstacles.group, this.groundBody);
     this.physics.add.collider(
       this.player,
       this.segments.platformGroup,
-      undefined,
-      this.canLandOnPlatform,
-      this,
     );
 
-    this.physics.add.overlap(this.player, this.obstacles.group, this.handleObstacleHit, undefined, this);
-    this.physics.add.overlap(this.player, this.items.itemGroup, this.handleItemPickup, undefined, this);
-    this.physics.add.overlap(this.player, this.items.scrollGroup, this.handleScrollPickup, undefined, this);
+    this.physics.add.overlap(this.player, this.segments.obstacleGroup, this.handleObstacleHit, undefined, this);
     this.physics.add.overlap(this.player, this.segments.coinGroup, this.handleItemPickup, undefined, this);
+    this.physics.add.overlap(this.player, this.scrollGroup, this.handleScrollPickup, undefined, this);
 
     this.hud = new HUD(this);
     this.health.onChange((cur, max) => this.hud.setHealth(cur, max));
     this.stage.onChange((p) => this.hud.setProgress(p));
     this.stage.onCheckpoint((cp) => this.handleCheckpoint(cp));
-    this.hud.setStageLabel(`Stage 1-${this.run.stageIndex}`);
+    this.hud.setStageLabel(`Stage 1-${this.run.stageIndex} · ${disasterLabel(disasterKind)}`);
     this.hud.setCoins(this.run.totalCoins);
     this.createPauseButton();
 
     this.disaster.onTrigger(() => {
       this.sound.play(SoundKey.DisasterAppear);
-      this.hud.setDisasterStatus("⚠ 재난 출현 — 두루마리를 찾아라!");
+      if (this.disaster.kind === "flood") {
+        this.floodDamageTaken = 0;
+        this.resetFloodContact();
+      }
+      this.hud.setDisasterStatus(
+        this.disaster.kind === "flood"
+          ? "🌊 홍수 발생 — 높은 발판과 두루마리를 찾아라!"
+          : "⚠ 재난 출현 — 두루마리를 찾아라!",
+      );
       this.cameras.main.shake(400, 0.005);
-      this.items.removeItemsByKind("energy_drink");
       this.chase?.destroy();
-      this.chase = new ChaseShadow(this);
+      this.chase = this.disaster.kind === "fire" ? new ChaseShadow(this) : undefined;
     });
     this.disaster.onSpawnScroll(() => {
       if (this.gameOver || this.cleared) return;
-      this.items.spawnScroll();
+      this.spawnScroll();
     });
     this.disaster.onResolve(() => {
-      this.hud.setDisasterStatus("✓ 재난 해소");
+      this.hud.setDisasterStatus(this.disaster.kind === "flood" ? "✓ 홍수 수위 하강" : "✓ 재난 해소");
       this.time.delayedCall(1500, () => {
         if (this.isEnergyBoostActive()) return;
         this.hud.setDisasterStatus("");
@@ -193,6 +202,7 @@ export class GameScene extends Phaser.Scene {
       this.clearResumeCountdown();
       this.teardownInput();
       this.energyBoostEmitter?.destroy();
+      this.floodWater?.destroy();
       this.quiz?.destroy();
       this.pauseButton?.destroy();
       this.bgm?.stop();
@@ -209,15 +219,16 @@ export class GameScene extends Phaser.Scene {
     this.health.tick(delta);
     this.stage.tick(delta * this.progressSpeedMultiplier());
     this.disaster.tick(delta, this.stage.progress);
+    this.floodWater?.update(this.disaster.floodLevelY);
 
     const speed = this.currentSpeed();
     this.bgFar.tilePositionX += (speed * 0.2 * delta) / 1000 / this.bgFar.tileScaleX;
     this.bgNear.tilePositionX += (speed * 0.5 * delta) / 1000 / this.bgNear.tileScaleX;
     this.ground.tilePositionX += (speed * delta) / 1000 / this.ground.tileScaleX;
 
-    this.obstacles.update(delta);
-    this.items.update(delta);
     this.segments.update(delta);
+    this.updateScrolls();
+    this.keepPlayerOnPlatform();
 
     if (this.chase) {
       this.chase.setX(this.disaster.chasePosition);
@@ -239,6 +250,8 @@ export class GameScene extends Phaser.Scene {
         return;
       }
     }
+
+    this.updateFloodDamage();
 
     this.player.update();
     this.updateEnergyBoostParticles();
@@ -269,6 +282,7 @@ export class GameScene extends Phaser.Scene {
   private handleObstacleHit(_player: unknown, obstacleObj: unknown): void {
     const obs = obstacleObj as Obstacle;
     if (obs.consumed) return;
+    if (obs.kind === "fire_smoke" && this.player.sliding) return;
 
     if (this.isEnergyBoostActive()) {
       obs.consumed = true;
@@ -309,6 +323,7 @@ export class GameScene extends Phaser.Scene {
       this.activateEnergyBoost();
     }
     if (item.coins > 0) {
+      this.sound.play(SoundKey.Coin);
       const coinMul = this.run.coinMul * this.run.pendingRewardMul * (this.run.pendingDoubleCoin ? 2 : 1);
       const earned = Math.round(item.coins * coinMul);
       this.coins += earned;
@@ -417,18 +432,51 @@ export class GameScene extends Phaser.Scene {
     const scroll = scrollObj as Scroll;
     if (scroll.consumed || this.quizActive) return;
     scroll.consumed = true;
+    this.sound.play(SoundKey.GetScroll);
     scroll.destroy();
     this.openQuiz();
+  }
+
+  private spawnScroll(): void {
+    const scroll = new Scroll(this, SPAWN_X, GROUND_Y - 120);
+    this.scrollGroup.add(scroll);
+    const body = scroll.body as Phaser.Physics.Arcade.Body;
+    body.setVelocityX(-this.currentSpeed());
+  }
+
+  private updateScrolls(): void {
+    const speed = this.currentSpeed();
+    for (const child of this.scrollGroup.getChildren()) {
+      const scroll = child as Scroll;
+      if (!scroll.active) continue;
+      const body = scroll.body as Phaser.Physics.Arcade.Body | null;
+      if (!body) continue;
+      body.setVelocityX(-speed);
+      if (scroll.x < DESPAWN_X) scroll.destroy();
+    }
+  }
+
+  private pauseScrolls(paused: boolean): void {
+    for (const child of this.scrollGroup.getChildren()) {
+      const scroll = child as Scroll;
+      const body = scroll.body as Phaser.Physics.Arcade.Body | null;
+      if (!body) continue;
+      if (paused) {
+        scroll.setData("pausedVx", body.velocity.x);
+        body.setVelocity(0, 0);
+      } else {
+        body.setVelocityX(scroll.getData("pausedVx") ?? 0);
+      }
+    }
   }
 
   private openQuiz(): void {
     this.quizActive = true;
     this.physics.world.pause();
-    this.obstacles.pause(true);
-    this.items.pause(true);
+    this.pauseScrolls(true);
     this.segments.pause(true);
 
-    const question = pickRandomQuiz(undefined, this.usedQuizIds);
+    const question = pickRandomQuiz(this.currentQuizPool(), this.usedQuizIds);
     this.usedQuizIds.add(question.id);
     this.quiz = new QuizModal(this, question, (result) => {
       this.quiz = undefined;
@@ -441,11 +489,14 @@ export class GameScene extends Phaser.Scene {
         this.disaster.resolve();
       }
       this.physics.world.resume();
-      this.obstacles.pause(false);
-      this.items.pause(false);
+      this.pauseScrolls(false);
       this.segments.pause(false);
       this.quizActive = false;
     });
+  }
+
+  private currentQuizPool(): QuizQuestion[] {
+    return this.disaster.kind === "flood" ? FLOOD_QUIZZES : CHAPTER_1_QUIZZES;
   }
 
   private flashHit(): void {
@@ -461,12 +512,14 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private createBackground(): void {
-    const farKey = this.textures.exists(AssetKey.BackgroundBack)
-      ? AssetKey.BackgroundBack
+  private createBackground(disasterKind: DisasterKind): void {
+    const preferredFarKey = disasterKind === "flood" ? AssetKey.BackgroundBackFlood : AssetKey.BackgroundBack;
+    const preferredNearKey = disasterKind === "flood" ? AssetKey.BackgroundMidFlood : AssetKey.BackgroundMid;
+    const farKey = this.textures.exists(preferredFarKey)
+      ? preferredFarKey
       : this.makeStripeTexture("__bg_far", 0x14182b, 0x1c2240, 64);
-    const nearKey = this.textures.exists(AssetKey.BackgroundMid)
-      ? AssetKey.BackgroundMid
+    const nearKey = this.textures.exists(preferredNearKey)
+      ? preferredNearKey
       : this.makeStripeTexture("__bg_near", 0x232a4a, 0x2d3560, 96);
 
     this.bgFar = this.add
@@ -588,18 +641,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private canLandOnPlatform(playerObj: unknown, platformObj: unknown): boolean {
-    const player = playerObj as Player;
-    const platform = platformObj as Platform;
-    const playerBody = player.body as Phaser.Physics.Arcade.Body | null;
-    const platformBody = platform.body as Phaser.Physics.Arcade.Body | null;
-    if (!playerBody || !platformBody) return false;
-    if (playerBody.velocity.y < 0) return false;
-
-    const previousBottom = playerBody.bottom - playerBody.deltaY();
-    return previousBottom <= platformBody.top + 8;
-  }
-
   private findCurrentPlatformSupportY(): number | null {
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
     if (!playerBody) return null;
@@ -610,13 +651,23 @@ export class GameScene extends Phaser.Scene {
       const platformBody = platform.body as Phaser.Physics.Arcade.Body | null;
       if (!platform.active || !platformBody) continue;
 
-      const overlapsX = playerBody.right > platformBody.left + 4 && playerBody.left < platformBody.right - 4;
-      const standingOnTop = playerBody.bottom >= platformBody.top - 6 && playerBody.bottom <= platformBody.top + 18;
+      const overlapsX = playerBody.right > platformBody.left + 8 && playerBody.left < platformBody.right - 8;
+      const standingOnTop = playerBody.bottom >= platformBody.top - 14 && playerBody.bottom <= platformBody.top + 42;
       if (!overlapsX || !standingOnTop) continue;
       if (supportY === null || platformBody.top < supportY) supportY = platformBody.top;
     }
 
     return supportY;
+  }
+
+  private keepPlayerOnPlatform(): void {
+    const body = this.player.body as Phaser.Physics.Arcade.Body | null;
+    if (!body || body.velocity.y < -20) return;
+
+    const supportY = this.findCurrentPlatformSupportY();
+    if (supportY === null) return;
+
+    this.player.snapToSupport(supportY);
   }
 
   private createPauseButton(): void {
@@ -655,8 +706,7 @@ export class GameScene extends Phaser.Scene {
 
   private freezeGameplay(): void {
     this.physics.world.pause();
-    this.obstacles.pause(true);
-    this.items.pause(true);
+    this.pauseScrolls(true);
     this.segments.pause(true);
     this.tweens.pauseAll();
     this.time.paused = true;
@@ -704,8 +754,7 @@ export class GameScene extends Phaser.Scene {
     this.time.paused = false;
     this.tweens.resumeAll();
     this.physics.world.resume();
-    this.obstacles.pause(false);
-    this.items.pause(false);
+    this.pauseScrolls(false);
     this.segments.pause(false);
     this.isGamePaused = false;
     if (this.isEnergyBoostActive()) this.startEnergyBoostParticles();
@@ -851,14 +900,65 @@ export class GameScene extends Phaser.Scene {
 
   private handleChaseCaught(): void {
     if (this.gameOver) return;
-    this.gameOver = true;
-    this.health.damage(999);
+    this.health.damage(CHASE_DAMAGE);
+    this.iframesUntil = this.time.now + COLLISION_IFRAMES_MS;
+    this.player.playHit();
     this.stopEnergyBoostParticles();
     this.sound.play(SoundKey.BossHit);
-    this.cameras.main.shake(600, 0.012);
-    this.cameras.main.flash(400, 255, 60, 30);
-    this.stopBgm();
-    this.showOverlay("🔥 재난에 휩쓸림", `획득 코인: ${this.coins}\n탭 또는 R: 재시작 / ESC: 메뉴`);
+    this.cameras.main.shake(320, 0.01);
+    this.cameras.main.flash(260, 255, 80, 30);
+    this.disaster.resolve();
+    this.hud.setDisasterStatus(`🔥 재난 피해 -${CHASE_DAMAGE} HP`);
+    this.time.delayedCall(1300, () => {
+      if (this.disaster.isActive) return;
+      this.hud.setDisasterStatus("");
+    });
+  }
+
+  private updateFloodDamage(): void {
+    if (this.disaster.kind !== "flood" || !this.disaster.isActive || this.isEnergyBoostActive()) {
+      this.resetFloodContact();
+      return;
+    }
+    const body = this.player.body as Phaser.Physics.Arcade.Body | null;
+    if (!body) return;
+
+    const waterLineY = this.disaster.floodLevelY;
+    if (body.bottom <= waterLineY + 4) {
+      this.resetFloodContact();
+      return;
+    }
+
+    if (this.touchingFloodWater && this.time.now < this.nextFloodDamageAt) return;
+    this.touchingFloodWater = true;
+    this.nextFloodDamageAt = this.time.now + FLOOD_DAMAGE_INTERVAL_MS;
+    this.applyFloodDamage();
+  }
+
+  private resetFloodContact(): void {
+    this.touchingFloodWater = false;
+    this.nextFloodDamageAt = 0;
+  }
+
+  private applyFloodDamage(): void {
+    this.health.damage(FLOOD_DAMAGE);
+    this.floodDamageTaken += FLOOD_DAMAGE;
+    this.player.playHit();
+    this.stopEnergyBoostParticles();
+    this.sound.play(SoundKey.BossHit);
+    this.cameras.main.shake(140, 0.005);
+    this.cameras.main.flash(160, 50, 150, 255);
+    this.hud.setDisasterStatus(`🌊 홍수 피해 -${FLOOD_DAMAGE} HP`);
+    if (this.floodDamageTaken >= FLOOD_AUTO_RESOLVE_DAMAGE) {
+      this.disaster.resolve();
+      this.resetFloodContact();
+      this.hud.setDisasterStatus("✓ 홍수 피해 누적 — 수위 하강");
+      return;
+    }
+    this.time.delayedCall(700, () => {
+      if (this.disaster.isActive) return;
+      this.hud.setDisasterStatus("");
+    });
   }
 
   private stopBgm(): void {
@@ -937,7 +1037,9 @@ export class GameScene extends Phaser.Scene {
     // --- 왼쪽 JUMP 버튼 ---
     const jumpX = GAME_WIDTH * 0.15;
     const jumpY = GAME_HEIGHT * 0.85;
-    const jumpBtn = this.add.circle(jumpX, jumpY, 70, 0xffffff, 0.3)
+    const buttonW = 240;
+    const buttonH = 128;
+    const jumpBtn = this.add.ellipse(jumpX, jumpY, buttonW, buttonH, 0xffffff, 0.3)
       .setScrollFactor(0)
       .setDepth(2000)
       .setInteractive();
@@ -955,7 +1057,7 @@ export class GameScene extends Phaser.Scene {
     // --- 오른쪽 SLIDE 버튼 ---
     const slideX = GAME_WIDTH * 0.85;
     const slideY = GAME_HEIGHT * 0.85;
-    const slideBtn = this.add.circle(slideX, slideY, 70, 0xffffff, 0.3)
+    const slideBtn = this.add.ellipse(slideX, slideY, buttonW, buttonH, 0xffffff, 0.3)
       .setScrollFactor(0)
       .setDepth(2000)
       .setInteractive();

@@ -33,6 +33,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private isSliding = false;
   private isHit = false;
   private hitTimer?: Phaser.Time.TimerEvent;
+  private supportUntil = 0;
   private pose?: PlayerPose;
   private readonly floorY: number;
 
@@ -172,11 +173,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     });
   }
 
-  public snapToSupport(y: number): void {
+  public snapToSupport(y: number, holdMs = 100): void {
     const body = this.body as Phaser.Physics.Arcade.Body | null;
     this.y = y;
     if (body) {
       body.setVelocityY(0);
+    }
+    this.supportUntil = this.scene.time.now + holdMs;
+    this.jumpsRemaining = 2;
+    if (!this.isSliding && !this.isHit) {
+      this.applyPose("run");
     }
   }
 
@@ -202,6 +208,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private isGrounded(body: Phaser.Physics.Arcade.Body): boolean {
     if (body.velocity.y < 0) return false;
+    if (this.scene.time.now <= this.supportUntil) return true;
     // 물리 충돌체로 무언가 위에 서 있는지 판정 (지면 또는 플랫폼)
     if (body.blocked.down || body.touching.down) return true;
     // 안전망: floorY 근처라면 접지로 간주

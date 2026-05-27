@@ -105,6 +105,9 @@ export class AssetPreviewScene extends Phaser.Scene {
     const pillar = new Obstacle(this, 0, "pillar");
     this.freezeBody(pillar);
 
+    const fireSmoke = new Obstacle(this, 0, "fire_smoke");
+    this.freezeBody(fireSmoke);
+
     const scroll = new Scroll(this, 0, 0);
     this.tweens.killTweensOf(scroll);
     this.freezeBody(scroll);
@@ -119,6 +122,7 @@ export class AssetPreviewScene extends Phaser.Scene {
     return [
       this.makeEntry("Smoke", smoke),
       this.makeEntry("Pillar", pillar),
+      this.makeEntry("Fire Smoke (slide)", fireSmoke),
       ...platforms,
       this.makeEntry("Scroll", scroll),
     ];

@@ -6,6 +6,8 @@ export const AssetKey = {
   ObstaclePillar: "asset:obstacle:pillar",
   BackgroundBack: "asset:background:back",
   BackgroundMid: "asset:background:mid",
+  BackgroundBackFlood: "asset:background:back:flood",
+  BackgroundMidFlood: "asset:background:mid:flood",
   Road: "asset:road",
   Deck: "asset:deck",
   ItemGimbap: "asset:item:gimbap",
@@ -29,6 +31,8 @@ export const SoundKey = {
   StageClear: "sound:stage_Clear",
   Exit: "sound:exit",
   Settings: "sound:settings",
+  Coin: "sound:coin",
+  GetScroll: "sound:get_scroll",
 } as const;
 
 export const GAME_IMAGE_ASSETS: Array<{ key: string; path: string }> = [
@@ -36,6 +40,8 @@ export const GAME_IMAGE_ASSETS: Array<{ key: string; path: string }> = [
   { key: AssetKey.ObstaclePillar, path: "assets/obstacles/pillar.png" },
   { key: AssetKey.BackgroundBack, path: "assets/environment/bg_far.png" },
   { key: AssetKey.BackgroundMid, path: "assets/environment/bg_mid.png" },
+  { key: AssetKey.BackgroundBackFlood, path: "assets/environment/bg_fat_flood.jpg" },
+  { key: AssetKey.BackgroundMidFlood, path: "assets/environment/bg_mid_flood.png" },
   { key: AssetKey.Road, path: "assets/environment/road.png" },
   { key: AssetKey.Deck, path: "assets/environment/deck.png" },
   { key: AssetKey.ItemGimbap, path: "assets/items/gimbap.png" },
@@ -81,4 +87,6 @@ export const GAME_AUDIO_ASSETS: Array<{ key: string; path: string }> = [
   { key: SoundKey.StageClear, path: "assets/sound/stage_Clear.wav" },
   { key: SoundKey.Exit, path: "assets/sound/exit.wav" },
   { key: SoundKey.Settings, path: "assets/sound/settings.wav" },
+  { key: SoundKey.Coin, path: "assets/sound/Coin4.ogg" },
+  { key: SoundKey.GetScroll, path: "assets/sound/get_scroll.ogg" },
 ];

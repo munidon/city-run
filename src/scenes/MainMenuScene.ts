@@ -64,6 +64,46 @@ export class MainMenuScene extends Phaser.Scene {
       }
     );
 
+    this.add
+      .text(GAME_WIDTH - 180, cy + 172, "DEBUG STAGE", {
+        fontFamily: "'Ramche', system-ui, sans-serif",
+        fontSize: "16px",
+        color: "#7f8db8",
+      })
+      .setOrigin(0.5);
+
+    makeButton(
+      this,
+      GAME_WIDTH - 180,
+      cy + 214,
+      "화재 바로 시작",
+      () => this.startDebugStage(1),
+      {
+        width: 210,
+        height: 40,
+        bgColor: 0x5a2a2a,
+        fontSize: "18px",
+        textColor: "#ffd8d8",
+        soundKey: SoundKey.GameStart,
+      }
+    );
+
+    makeButton(
+      this,
+      GAME_WIDTH - 180,
+      cy + 264,
+      "홍수 바로 시작",
+      () => this.startDebugStage(2),
+      {
+        width: 210,
+        height: 40,
+        bgColor: 0x1f5f8b,
+        fontSize: "18px",
+        textColor: "#d7f4ff",
+        soundKey: SoundKey.GameStart,
+      }
+    );
+
     this.input.keyboard?.on("keydown-SPACE", () => this.startGame());
     this.input.keyboard?.on("keydown-ENTER", () => this.startGame());
   }
@@ -71,5 +111,11 @@ export class MainMenuScene extends Phaser.Scene {
   private startGame(playSound = true): void {
     if (playSound) this.sound.play(SoundKey.GameStart);
     this.scene.start("GameScene", { run: new RunState() });
+  }
+
+  private startDebugStage(stageIndex: number): void {
+    const run = new RunState();
+    run.stageIndex = stageIndex;
+    this.scene.start("GameScene", { run });
   }
 }

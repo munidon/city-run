@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import { SoundKey } from "@/assets";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 import { Card, CardCategory, pickThreeCards } from "@/data/cards";
+import { disasterForStage, disasterLabel } from "@/data/disasters";
 import { RunState } from "@/state/RunState";
 
 const FONT = "'Ramche', system-ui, sans-serif";
@@ -52,11 +53,16 @@ export class CardSelectScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(cx, 130, `누적 코인: 🪙 ${this.run.totalCoins}  ·  카드 1장을 선택하세요`, {
+      .text(
+        cx,
+        130,
+        `누적 코인: 🪙 ${this.run.totalCoins}  ·  다음 재난: ${disasterLabel(disasterForStage(this.run.stageIndex + 1))}`,
+        {
         fontFamily: FONT,
         fontSize: "20px",
         color: "#cccccc",
-      })
+        },
+      )
       .setOrigin(0.5);
 
     this.cards = pickThreeCards(this.run.pickedCardIds);

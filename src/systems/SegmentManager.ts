@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { Platform } from "@/objects/Platform";
 import { Item } from "@/objects/Item";
+import { Obstacle } from "@/objects/Obstacle";
 import { DESPAWN_X, GAME_WIDTH, SPAWN_X } from "@/config";
 import { MapSegment, pickRandomSegment } from "@/data/segments";
 
@@ -12,6 +13,7 @@ import { MapSegment, pickRandomSegment } from "@/data/segments";
 export class SegmentManager {
   public readonly platformGroup: Phaser.Physics.Arcade.Group;
   public readonly coinGroup: Phaser.Physics.Arcade.Group;
+  public readonly obstacleGroup: Phaser.Physics.Arcade.Group;
 
   /** 다음 세그먼트의 좌측 가장자리가 위치할 (현재 시점의) 월드 X. 매 프레임 스크롤 속도만큼 감소. */
   private nextSpawnX: number = SPAWN_X;
@@ -33,6 +35,11 @@ export class SegmentManager {
     });
     this.coinGroup = scene.physics.add.group({
       classType: Item,
+      runChildUpdate: false,
+      allowGravity: false,
+    });
+    this.obstacleGroup = scene.physics.add.group({
+      classType: Obstacle,
       runChildUpdate: false,
       allowGravity: false,
     });
@@ -74,6 +81,7 @@ export class SegmentManager {
       return p.x + (p.displayWidth ?? 0);
     });
     sweep(this.coinGroup, (o) => (o as Item).x);
+    sweep(this.obstacleGroup, (o) => (o as Obstacle).x);
   }
 
   public pause(p: boolean): void {
@@ -93,11 +101,13 @@ export class SegmentManager {
     };
     freeze(this.platformGroup);
     freeze(this.coinGroup);
+    freeze(this.obstacleGroup);
   }
 
   public clear(): void {
     this.platformGroup.clear(true, true);
     this.coinGroup.clear(true, true);
+    this.obstacleGroup.clear(true, true);
   }
 
   public reset(): void {
@@ -122,6 +132,20 @@ export class SegmentManager {
       const coin = new Item(this.scene, leftWorldX + def.x, def.y, "coin");
       this.coinGroup.add(coin);
       const body = coin.body as Phaser.Physics.Arcade.Body;
+      body.setVelocityX(-speed);
+    }
+
+    for (const def of seg.items ?? []) {
+      const item = new Item(this.scene, leftWorldX + def.x, def.y, def.kind);
+      this.coinGroup.add(item);
+      const body = item.body as Phaser.Physics.Arcade.Body;
+      body.setVelocityX(-speed);
+    }
+
+    for (const def of seg.obstacles ?? []) {
+      const obstacle = new Obstacle(this.scene, leftWorldX + def.x, def.kind, def.y);
+      this.obstacleGroup.add(obstacle);
+      const body = obstacle.body as Phaser.Physics.Arcade.Body;
       body.setVelocityX(-speed);
     }
 

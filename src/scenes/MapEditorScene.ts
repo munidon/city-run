@@ -1,21 +1,67 @@
 import * as Phaser from "phaser";
 import { SoundKey } from "@/assets";
 import { GAME_HEIGHT, GAME_WIDTH, GROUND_Y, PLAYER_X } from "@/config";
-import { CoinDef, MapSegment, PlatformDef, SEGMENTS } from "@/data/segments";
+import {
+  CoinDef,
+  MapSegment,
+  PlatformDef,
+  SEGMENTS,
+  SegmentItemDef,
+  SegmentObstacleDef,
+} from "@/data/segments";
 import { sampleArc, snapPointsAlongArc } from "@/editor/JumpTrajectory";
+import { ItemKind } from "@/objects/Item";
+import { ObstacleKind } from "@/objects/Obstacle";
 import { RunState } from "@/state/RunState";
 
-type Tool = "select" | "platform" | "coin" | "erase";
+type Tool = "select" | "platform" | "coin" | "item" | "obstacle" | "erase";
+type PlaceableItemKind = Exclude<ItemKind, "coin">;
 
 const STORAGE_KEY = "doan_map_editor_v1";
 const GRID = 32;
 const PLATFORM_DEFAULT_HEIGHT = 24;
-const PALETTE_HEIGHT = 80;
+const PALETTE_HEIGHT = 104;
 const SIDEBAR_WIDTH = 240;
 const CANVAS_X = 0;
 const CANVAS_Y = PALETTE_HEIGHT;
 const CANVAS_WIDTH = GAME_WIDTH - SIDEBAR_WIDTH;
 const CANVAS_HEIGHT = GAME_HEIGHT - PALETTE_HEIGHT;
+
+const ITEM_KINDS: PlaceableItemKind[] = [
+  "gimbap",
+  "bento",
+  "energy_drink",
+  "fire_extinguisher",
+  "gas_mask",
+  "wet_towel",
+];
+const OBSTACLE_KINDS: ObstacleKind[] = ["smoke", "pillar", "fire_smoke"];
+const ITEM_LABELS: Record<PlaceableItemKind, string> = {
+  gimbap: "김밥",
+  bento: "도시락",
+  energy_drink: "에너지",
+  fire_extinguisher: "소화기",
+  gas_mask: "방독면",
+  wet_towel: "젖은수건",
+};
+const OBSTACLE_LABELS: Record<ObstacleKind, string> = {
+  smoke: "연기",
+  pillar: "기둥",
+  fire_smoke: "슬라이드연기",
+};
+const ITEM_COLORS: Record<PlaceableItemKind, number> = {
+  gimbap: 0xf5c98a,
+  bento: 0xff7a59,
+  energy_drink: 0x2dd4bf,
+  fire_extinguisher: 0xdc2626,
+  gas_mask: 0x334155,
+  wet_towel: 0x38bdf8,
+};
+const OBSTACLE_COLORS: Record<ObstacleKind, number> = {
+  smoke: 0x8b5a2b,
+  pillar: 0x708090,
+  fire_smoke: 0x252833,
+};
 
 interface EditorState {
   segments: MapSegment[];
@@ -38,6 +84,18 @@ function emptySegment(id: string): MapSegment {
     exitGroundY: GROUND_Y,
     platforms: [],
     coins: [],
+    items: [],
+    obstacles: [],
+  };
+}
+
+function normalizeSegment(seg: MapSegment): MapSegment {
+  return {
+    ...seg,
+    platforms: seg.platforms ?? [],
+    coins: seg.coins ?? [],
+    items: seg.items ?? [],
+    obstacles: seg.obstacles ?? [],
   };
 }
 
@@ -47,7 +105,10 @@ function loadState(): EditorState {
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw) as EditorState;
     if (!parsed.segments || parsed.segments.length === 0) return defaultState();
-    return parsed;
+    return {
+      ...parsed,
+      segments: parsed.segments.map(normalizeSegment),
+    };
   } catch {
     return defaultState();
   }
@@ -68,6 +129,8 @@ function snap(v: number, step: number = GRID): number {
 export class MapEditorScene extends Phaser.Scene {
   private state!: EditorState;
   private tool: Tool = "platform";
+  private selectedItemKind: PlaceableItemKind = "gimbap";
+  private selectedObstacleKind: ObstacleKind = "smoke";
 
   // 캔버스(작업 영역) 좌표는 세그먼트 로컬 좌표와 동일하게 유지.
   private canvasContainer!: Phaser.GameObjects.Container;
@@ -75,12 +138,16 @@ export class MapEditorScene extends Phaser.Scene {
   private guideGfx!: Phaser.GameObjects.Graphics;
   private platformGfx!: Phaser.GameObjects.Graphics;
   private coinGfx!: Phaser.GameObjects.Graphics;
+  private itemGfx!: Phaser.GameObjects.Graphics;
+  private obstacleGfx!: Phaser.GameObjects.Graphics;
   private arcGfx!: Phaser.GameObjects.Graphics;
   private previewGfx!: Phaser.GameObjects.Graphics;
 
   private statusText!: Phaser.GameObjects.Text;
   private segMetaText!: Phaser.GameObjects.Text;
   private toolButtons: Record<Tool, Phaser.GameObjects.Container> = {} as any;
+  private itemKindButton!: Phaser.GameObjects.Container;
+  private obstacleKindButton!: Phaser.GameObjects.Container;
 
   // platform 드래그 상태
   private dragStart?: { x: number; y: number };
@@ -111,7 +178,11 @@ export class MapEditorScene extends Phaser.Scene {
     this.input.keyboard?.on("keydown-ONE", () => this.setTool("select"));
     this.input.keyboard?.on("keydown-TWO", () => this.setTool("platform"));
     this.input.keyboard?.on("keydown-THREE", () => this.setTool("coin"));
-    this.input.keyboard?.on("keydown-FOUR", () => this.setTool("erase"));
+    this.input.keyboard?.on("keydown-FOUR", () => this.setTool("item"));
+    this.input.keyboard?.on("keydown-FIVE", () => this.setTool("obstacle"));
+    this.input.keyboard?.on("keydown-SIX", () => this.setTool("erase"));
+    this.input.keyboard?.on("keydown-Q", () => this.cycleItemKind());
+    this.input.keyboard?.on("keydown-E", () => this.cycleObstacleKind());
     this.input.keyboard?.on("keydown-D", () => {
       this.arcDouble = !this.arcDouble;
       this.refreshArc();
@@ -119,7 +190,7 @@ export class MapEditorScene extends Phaser.Scene {
     });
 
     this.refreshAll();
-    this.setStatus("키 1~4: 도구 / D: 단·이중 점프 토글 / ESC: 메뉴");
+    this.setStatus("키 1~6: 도구 / Q,E: 종류 변경 / D: 점프 곡선 / ESC: 메뉴");
   }
 
   // -------------------- UI 생성 --------------------
@@ -132,21 +203,26 @@ export class MapEditorScene extends Phaser.Scene {
       { tool: "select", label: "1 선택" },
       { tool: "platform", label: "2 플랫폼" },
       { tool: "coin", label: "3 코인(점프)" },
-      { tool: "erase", label: "4 지우개" },
+      { tool: "item", label: "4 아이템" },
+      { tool: "obstacle", label: "5 장애물" },
+      { tool: "erase", label: "6 지우개" },
     ];
     tools.forEach((t, i) => {
-      this.toolButtons[t.tool] = this.makeButton(20 + i * 130, 10, 120, 32, t.label, () => this.setTool(t.tool));
+      this.toolButtons[t.tool] = this.makeButton(20 + i * 104, 10, 96, 30, t.label, () => this.setTool(t.tool));
     });
 
-    this.makeButton(20, 44, 110, 28, "▶ Test Play", () => this.testPlay());
-    this.makeButton(140, 44, 110, 28, "💾 Save", () => {
+    this.itemKindButton = this.makeButton(660, 10, 150, 30, this.itemKindLabel(), () => this.cycleItemKind());
+    this.obstacleKindButton = this.makeButton(820, 10, 190, 30, this.obstacleKindLabel(), () => this.cycleObstacleKind());
+
+    this.makeButton(20, 54, 110, 28, "▶ Test Play", () => this.testPlay());
+    this.makeButton(140, 54, 110, 28, "💾 Save", () => {
       saveState(this.state);
       this.setStatus("localStorage 저장 완료");
     });
-    this.makeButton(260, 44, 130, 28, "📋 Export TS", () => this.exportTS());
-    this.makeButton(400, 44, 130, 28, "📥 Import TS", () => this.importTS());
-    this.makeButton(540, 44, 80, 28, "+ 새 세그", () => this.newSegment());
-    this.makeButton(630, 44, 80, 28, "🗑 삭제", () => this.deleteActive());
+    this.makeButton(260, 54, 130, 28, "📋 Export TS", () => this.exportTS());
+    this.makeButton(400, 54, 130, 28, "📥 Import TS", () => this.importTS());
+    this.makeButton(540, 54, 80, 28, "+ 새 세그", () => this.newSegment());
+    this.makeButton(630, 54, 80, 28, "🗑 삭제", () => this.deleteActive());
 
     this.statusText = this.add
       .text(GAME_WIDTH - SIDEBAR_WIDTH - 10, 10, "", {
@@ -218,9 +294,11 @@ export class MapEditorScene extends Phaser.Scene {
         `difficulty: ${seg.difficulty}\n` +
         `platforms: ${seg.platforms.length}\n` +
         `coins: ${seg.coins.length}\n\n` +
+        `items: ${seg.items.length}\n` +
+        `obstacles: ${seg.obstacles.length}\n\n` +
         `좌클릭: 도구 적용\n` +
         `우클릭(코인 모드): 시작점 초기화\n` +
-        `D: 이중 점프 토글`,
+        `Q/E: 아이템/장애물 종류`,
     );
   }
 
@@ -251,6 +329,11 @@ export class MapEditorScene extends Phaser.Scene {
     return c;
   }
 
+  private setButtonLabel(button: Phaser.GameObjects.Container, label: string): void {
+    const txt = button.list[1] as Phaser.GameObjects.Text;
+    txt.setText(label);
+  }
+
   private createCanvas(): void {
     this.canvasContainer = this.add.container(CANVAS_X, CANVAS_Y).setDepth(1);
 
@@ -262,9 +345,20 @@ export class MapEditorScene extends Phaser.Scene {
     this.guideGfx = this.add.graphics();
     this.platformGfx = this.add.graphics();
     this.coinGfx = this.add.graphics();
+    this.itemGfx = this.add.graphics();
+    this.obstacleGfx = this.add.graphics();
     this.arcGfx = this.add.graphics();
     this.previewGfx = this.add.graphics();
-    this.canvasContainer.add([this.gridGfx, this.guideGfx, this.platformGfx, this.coinGfx, this.arcGfx, this.previewGfx]);
+    this.canvasContainer.add([
+      this.gridGfx,
+      this.guideGfx,
+      this.platformGfx,
+      this.coinGfx,
+      this.itemGfx,
+      this.obstacleGfx,
+      this.arcGfx,
+      this.previewGfx,
+    ]);
 
     // 플레이어 위치 마커
     const playerMarker = this.add.rectangle(PLAYER_X, GROUND_Y, 20, 60, 0xffd76b, 0.6).setOrigin(0.5, 1);
@@ -281,6 +375,28 @@ export class MapEditorScene extends Phaser.Scene {
       bg.setFillStyle(k === t ? 0x6b78d6 : 0x3a4170);
     });
     this.setStatus(`도구: ${t}`);
+  }
+
+  private cycleItemKind(): void {
+    const index = ITEM_KINDS.indexOf(this.selectedItemKind);
+    this.selectedItemKind = ITEM_KINDS[(index + 1) % ITEM_KINDS.length];
+    this.setButtonLabel(this.itemKindButton, this.itemKindLabel());
+    if (this.tool === "item") this.setStatus(`아이템: ${ITEM_LABELS[this.selectedItemKind]}`);
+  }
+
+  private cycleObstacleKind(): void {
+    const index = OBSTACLE_KINDS.indexOf(this.selectedObstacleKind);
+    this.selectedObstacleKind = OBSTACLE_KINDS[(index + 1) % OBSTACLE_KINDS.length];
+    this.setButtonLabel(this.obstacleKindButton, this.obstacleKindLabel());
+    if (this.tool === "obstacle") this.setStatus(`장애물: ${OBSTACLE_LABELS[this.selectedObstacleKind]}`);
+  }
+
+  private itemKindLabel(): string {
+    return `Q 아이템: ${ITEM_LABELS[this.selectedItemKind]}`;
+  }
+
+  private obstacleKindLabel(): string {
+    return `E 장애물: ${OBSTACLE_LABELS[this.selectedObstacleKind]}`;
   }
 
   private activeSegment(): MapSegment | undefined {
@@ -323,10 +439,30 @@ export class MapEditorScene extends Phaser.Scene {
       }
     } else if (this.tool === "erase") {
       this.eraseAt(x, y);
+    } else if (this.tool === "item") {
+      const def: SegmentItemDef = {
+        kind: this.selectedItemKind,
+        x: snap(x, 16),
+        y: snap(y, 16),
+      };
+      seg.items.push(def);
+      this.refreshAll();
+    } else if (this.tool === "obstacle") {
+      const def: SegmentObstacleDef = {
+        kind: this.selectedObstacleKind,
+        x: snap(x, 16),
+        y: snap(y, 16),
+      };
+      seg.obstacles.push(def);
+      this.refreshAll();
     } else if (this.tool === "select") {
-      // 선택 모드: 플랫폼 클릭 시 출력만
+      // 선택 모드: 클릭한 오브젝트 정보 출력
       const plat = this.findPlatformAt(seg, x, y);
+      const item = this.findItemAt(seg, x, y);
+      const obs = this.findObstacleAt(seg, x, y);
       if (plat) this.setStatus(`platform (x=${plat.x}, y=${plat.y}, w=${plat.width})`);
+      else if (item) this.setStatus(`item ${item.kind} (x=${item.x}, y=${item.y})`);
+      else if (obs) this.setStatus(`obstacle ${obs.kind} (x=${obs.x}, y=${obs.y})`);
     }
 
     if (p.rightButtonDown() && this.tool === "coin") {
@@ -345,6 +481,10 @@ export class MapEditorScene extends Phaser.Scene {
       const y2 = snap(y);
       this.previewGfx.fillStyle(0x9ad36b, 0.4);
       this.previewGfx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+    } else if (this.tool === "item") {
+      this.drawItemMarker(this.previewGfx, snap(x, 16), snap(y, 16), this.selectedItemKind, 0.55);
+    } else if (this.tool === "obstacle") {
+      this.drawObstacleMarker(this.previewGfx, snap(x, 16), snap(y, 16), this.selectedObstacleKind, 0.55);
     }
   }
 
@@ -376,10 +516,22 @@ export class MapEditorScene extends Phaser.Scene {
   private eraseAt(x: number, y: number): void {
     const seg = this.activeSegment();
     if (!seg) return;
-    // 플랫폼 우선, 그 다음 코인
+    // 큰 오브젝트부터 지운 뒤 작은 오브젝트를 검사한다.
     const pi = seg.platforms.findIndex((p) => x >= p.x && x <= p.x + p.width && y >= p.y && y <= p.y + p.height);
     if (pi >= 0) {
       seg.platforms.splice(pi, 1);
+      this.refreshAll();
+      return;
+    }
+    const oi = seg.obstacles.findIndex((o) => Math.hypot(o.x - x, o.y - y) < this.obstaclePickRadius(o.kind));
+    if (oi >= 0) {
+      seg.obstacles.splice(oi, 1);
+      this.refreshAll();
+      return;
+    }
+    const ii = seg.items.findIndex((i) => Math.hypot(i.x - x, i.y - y) < 24);
+    if (ii >= 0) {
+      seg.items.splice(ii, 1);
       this.refreshAll();
       return;
     }
@@ -392,6 +544,14 @@ export class MapEditorScene extends Phaser.Scene {
 
   private findPlatformAt(seg: MapSegment, x: number, y: number): PlatformDef | undefined {
     return seg.platforms.find((p) => x >= p.x && x <= p.x + p.width && y >= p.y && y <= p.y + p.height);
+  }
+
+  private findItemAt(seg: MapSegment, x: number, y: number): SegmentItemDef | undefined {
+    return seg.items.find((i) => Math.hypot(i.x - x, i.y - y) < 24);
+  }
+
+  private findObstacleAt(seg: MapSegment, x: number, y: number): SegmentObstacleDef | undefined {
+    return seg.obstacles.find((o) => Math.hypot(o.x - x, o.y - y) < this.obstaclePickRadius(o.kind));
   }
 
   private findCandidateAt(x: number, y: number): { x: number; y: number } | undefined {
@@ -486,6 +646,8 @@ export class MapEditorScene extends Phaser.Scene {
   private drawSegment(): void {
     this.platformGfx.clear();
     this.coinGfx.clear();
+    this.itemGfx.clear();
+    this.obstacleGfx.clear();
     const seg = this.activeSegment();
     if (!seg) return;
 
@@ -502,6 +664,55 @@ export class MapEditorScene extends Phaser.Scene {
       this.coinGfx.lineStyle(2, 0xb38600, 1);
       this.coinGfx.strokeCircle(c.x, c.y, 7);
     }
+
+    for (const item of seg.items) {
+      this.drawItemMarker(this.itemGfx, item.x, item.y, item.kind, 1);
+    }
+
+    for (const obstacle of seg.obstacles) {
+      this.drawObstacleMarker(this.obstacleGfx, obstacle.x, obstacle.y, obstacle.kind, 1);
+    }
+  }
+
+  private drawItemMarker(
+    gfx: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    kind: PlaceableItemKind,
+    alpha: number,
+  ): void {
+    gfx.fillStyle(ITEM_COLORS[kind], alpha);
+    gfx.fillCircle(x, y, 13);
+    gfx.lineStyle(2, 0xffffff, alpha);
+    gfx.strokeCircle(x, y, 13);
+  }
+
+  private drawObstacleMarker(
+    gfx: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    kind: ObstacleKind,
+    alpha: number,
+  ): void {
+    gfx.fillStyle(OBSTACLE_COLORS[kind], alpha);
+    if (kind === "fire_smoke") {
+      gfx.fillEllipse(x, y, 110, 54);
+      gfx.fillStyle(0xff6a2a, alpha * 0.45);
+      gfx.fillCircle(x - 24, y + 3, 14);
+      gfx.fillCircle(x + 22, y + 4, 12);
+    } else if (kind === "pillar") {
+      gfx.fillRoundedRect(x - 26, y - 78, 52, 156, 8);
+    } else {
+      gfx.fillRoundedRect(x - 40, y - 34, 80, 68, 8);
+    }
+    gfx.lineStyle(2, 0xffffff, alpha * 0.8);
+    gfx.strokeCircle(x, y, this.obstaclePickRadius(kind));
+  }
+
+  private obstaclePickRadius(kind: ObstacleKind): number {
+    if (kind === "fire_smoke") return 58;
+    if (kind === "pillar") return 42;
+    return 40;
   }
 
   private isInCanvas(p: Phaser.Input.Pointer): boolean {
@@ -546,6 +757,16 @@ export class MapEditorScene extends Phaser.Scene {
         lines.push(`      { x: ${c.x}, y: ${c.y} },`);
       }
       lines.push("    ],");
+      lines.push("    items: [");
+      for (const item of seg.items) {
+        lines.push(`      { kind: ${JSON.stringify(item.kind)}, x: ${item.x}, y: ${item.y} },`);
+      }
+      lines.push("    ],");
+      lines.push("    obstacles: [");
+      for (const obstacle of seg.obstacles) {
+        lines.push(`      { kind: ${JSON.stringify(obstacle.kind)}, x: ${obstacle.x}, y: ${obstacle.y} },`);
+      }
+      lines.push("    ],");
       lines.push("  },");
     }
     lines.push("];");
@@ -573,7 +794,7 @@ export class MapEditorScene extends Phaser.Scene {
       // 안전성: 에디터는 사용자 본인이 직접 붙여넣는 도구이므로 Function 사용 허용
       const arr = new Function(`return (${txt});`)() as MapSegment[];
       if (!Array.isArray(arr)) throw new Error("not array");
-      this.state.segments = arr;
+      this.state.segments = arr.map(normalizeSegment);
       this.state.activeId = arr[0]?.id ?? "seg-1";
       this.refreshAll();
       this.setStatus(`Import 완료: ${arr.length}개 세그먼트`);
@@ -590,5 +811,5 @@ export class MapEditorScene extends Phaser.Scene {
 
 /** 빌트인 SEGMENTS를 한 번에 에디터로 가져오기 위한 헬퍼 (필요 시 콘솔에서 사용) */
 export function importBuiltinSegments(): EditorState {
-  return { segments: SEGMENTS.map((s) => ({ ...s })), activeId: SEGMENTS[0]?.id ?? "seg-1" };
+  return { segments: SEGMENTS.map((s) => normalizeSegment({ ...s })), activeId: SEGMENTS[0]?.id ?? "seg-1" };
 }

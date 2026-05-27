@@ -1,6 +1,10 @@
+import { GAME_HEIGHT, GROUND_Y } from "@/config";
+import type { DisasterKind } from "@/data/disasters";
+
 export type DisasterListener = () => void;
 
 interface DisasterConfig {
+  kind: DisasterKind;
   triggerPoints: number[];
   scrollDelayMsMin: number;
   scrollDelayMsMax: number;
@@ -9,17 +13,43 @@ interface DisasterConfig {
   chaseTargetX: number;
   chaseTimeToTargetMs: number;
   chaseRetreatPxPerSec: number;
+  floodStartY: number;
+  floodTargetY: number;
+  floodRiseTimeToTargetMs: number;
+  floodRetreatPxPerSec: number;
 }
 
-const DEFAULT_CONFIG: DisasterConfig = {
-  triggerPoints: [0.2, 0.4, 0.6, 0.8],
-  scrollDelayMsMin: 7000,
-  scrollDelayMsMax: 10000,
-  speedBonus: 0.3,
-  chaseStartX: -240,
-  chaseTargetX: 448,
-  chaseTimeToTargetMs: 17000,
-  chaseRetreatPxPerSec: 320,
+const CONFIGS: Record<DisasterKind, DisasterConfig> = {
+  fire: {
+    kind: "fire",
+    triggerPoints: [0.2, 0.4, 0.6, 0.8],
+    scrollDelayMsMin: 7000,
+    scrollDelayMsMax: 10000,
+    speedBonus: 0.3,
+    chaseStartX: -240,
+    chaseTargetX: 448,
+    chaseTimeToTargetMs: 17000,
+    chaseRetreatPxPerSec: 320,
+    floodStartY: GAME_HEIGHT + 96,
+    floodTargetY: GROUND_Y - 150,
+    floodRiseTimeToTargetMs: 15000,
+    floodRetreatPxPerSec: 260,
+  },
+  flood: {
+    kind: "flood",
+    triggerPoints: [0.2, 0.4, 0.6, 0.8],
+    scrollDelayMsMin: 6500,
+    scrollDelayMsMax: 9500,
+    speedBonus: 0.18,
+    chaseStartX: -240,
+    chaseTargetX: 448,
+    chaseTimeToTargetMs: 17000,
+    chaseRetreatPxPerSec: 320,
+    floodStartY: GAME_HEIGHT + 96,
+    floodTargetY: GROUND_Y - 150,
+    floodRiseTimeToTargetMs: 15000,
+    floodRetreatPxPerSec: 260,
+  },
 };
 
 export class DisasterSystem {
@@ -30,6 +60,7 @@ export class DisasterSystem {
   private scrollDelayMs = 0;
   private scrollSpawned = false;
   private chaseX = 0;
+  private floodY = 0;
   private retreating = false;
   private suppressionMs = 0;
 
@@ -37,8 +68,9 @@ export class DisasterSystem {
   private spawnScrollListeners: DisasterListener[] = [];
   private resolveListeners: DisasterListener[] = [];
 
-  constructor(private readonly config: DisasterConfig = DEFAULT_CONFIG) {
+  constructor(kind: DisasterKind = "fire", private readonly config: DisasterConfig = CONFIGS[kind]) {
     this.chaseX = this.config.chaseStartX;
+    this.floodY = this.config.floodStartY;
   }
 
   public tick(deltaMs: number, progress01: number): void {
@@ -57,15 +89,18 @@ export class DisasterSystem {
     }
 
     if (this.retreating) {
-      this.chaseX -= (this.config.chaseRetreatPxPerSec * deltaMs) / 1000;
-      if (this.chaseX <= this.config.chaseStartX) {
-        this.chaseX = this.config.chaseStartX;
-        this.retreating = false;
-        this.currentWave++;
-        this.triggered = false;
-        this.resolved = false;
-        this.msSinceTrigger = 0;
-        this.scrollSpawned = false;
+      if (this.config.kind === "flood") {
+        this.floodY += (this.config.floodRetreatPxPerSec * deltaMs) / 1000;
+        if (this.floodY >= this.config.floodStartY) {
+          this.floodY = this.config.floodStartY;
+          this.finishRetreat();
+        }
+      } else {
+        this.chaseX -= (this.config.chaseRetreatPxPerSec * deltaMs) / 1000;
+        if (this.chaseX <= this.config.chaseStartX) {
+          this.chaseX = this.config.chaseStartX;
+          this.finishRetreat();
+        }
       }
       return;
     }
@@ -73,9 +108,15 @@ export class DisasterSystem {
     if (this.resolved) return;
 
     this.msSinceTrigger += deltaMs;
-    const advancePxPerMs =
-      (this.config.chaseTargetX - this.config.chaseStartX) / this.config.chaseTimeToTargetMs;
-    this.chaseX += advancePxPerMs * deltaMs;
+    if (this.config.kind === "flood") {
+      const risePxPerMs =
+        (this.config.floodStartY - this.config.floodTargetY) / this.config.floodRiseTimeToTargetMs;
+      this.floodY = Math.max(this.config.floodTargetY, this.floodY - risePxPerMs * deltaMs);
+    } else {
+      const advancePxPerMs =
+        (this.config.chaseTargetX - this.config.chaseStartX) / this.config.chaseTimeToTargetMs;
+      this.chaseX += advancePxPerMs * deltaMs;
+    }
 
     if (!this.scrollSpawned && this.msSinceTrigger >= this.scrollDelayMs) {
       this.scrollSpawned = true;
@@ -85,6 +126,14 @@ export class DisasterSystem {
 
   public get chasePosition(): number {
     return this.chaseX;
+  }
+
+  public get floodLevelY(): number {
+    return this.floodY;
+  }
+
+  public get kind(): DisasterKind {
+    return this.config.kind;
   }
 
   public get hasChase(): boolean {
@@ -129,9 +178,20 @@ export class DisasterSystem {
 
   private trigger(): void {
     this.triggered = true;
+    this.chaseX = this.config.chaseStartX;
+    this.floodY = this.config.floodStartY;
     this.scrollDelayMs =
       this.config.scrollDelayMsMin +
       Math.random() * (this.config.scrollDelayMsMax - this.config.scrollDelayMsMin);
     for (const l of this.triggerListeners) l();
+  }
+
+  private finishRetreat(): void {
+    this.retreating = false;
+    this.currentWave++;
+    this.triggered = false;
+    this.resolved = false;
+    this.msSinceTrigger = 0;
+    this.scrollSpawned = false;
   }
 }

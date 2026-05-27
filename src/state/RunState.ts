@@ -5,7 +5,6 @@ export class RunState {
   public maxHpBonus = 0;
   public coinMul = 1;
   public healMul = 1;
-  public obstacleDensityMul = 1;
 
   public pendingFullHeal = false;
   public pendingDoubleCoin = false;
@@ -20,7 +19,6 @@ export class RunState {
     this.maxHpBonus = 0;
     this.coinMul = 1;
     this.healMul = 1;
-    this.obstacleDensityMul = 1;
     this.pendingFullHeal = false;
     this.pendingDoubleCoin = false;
     this.pendingStartHpRatio = null;
