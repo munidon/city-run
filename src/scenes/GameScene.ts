@@ -11,6 +11,7 @@ import { FloodWater } from "@/objects/FloodWater";
 import { HealthSystem } from "@/systems/HealthSystem";
 import { StageSystem } from "@/systems/StageSystem";
 import { DisasterSystem } from "@/systems/DisasterSystem";
+import { RandomSpawnSystem } from "@/systems/RandomSpawnSystem";
 import { SegmentManager } from "@/systems/SegmentManager";
 import { MapSegment } from "@/data/segments";
 import { getBgmVolume } from "@/settings";
@@ -41,6 +42,7 @@ export class GameScene extends Phaser.Scene {
   private hud!: HUD;
   private disaster!: DisasterSystem;
   private segments!: SegmentManager;
+  private randomSpawns!: RandomSpawnSystem;
   private scrollGroup!: Phaser.Physics.Arcade.Group;
   private testSegment?: MapSegment;
 
@@ -142,6 +144,14 @@ export class GameScene extends Phaser.Scene {
       () => this.stage.progress,
     );
     if (this.testSegment) this.segments.setForcedSegment(this.testSegment);
+    this.randomSpawns = new RandomSpawnSystem(
+      this,
+      this.segments.coinGroup,
+      this.segments.obstacleGroup,
+      () => this.currentSpeed(),
+      () => this.stage.progress,
+      () => this.disaster.isActive,
+    );
     this.scrollGroup = this.physics.add.group({ classType: Scroll, runChildUpdate: false, allowGravity: false });
 
     this.physics.add.collider(
@@ -227,6 +237,7 @@ export class GameScene extends Phaser.Scene {
     this.ground.tilePositionX += (speed * delta) / 1000 / this.ground.tileScaleX;
 
     this.segments.update(delta);
+    this.randomSpawns.update(delta);
     this.updateScrolls();
     this.keepPlayerOnPlatform();
 
