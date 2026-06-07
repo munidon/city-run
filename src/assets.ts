@@ -4,6 +4,7 @@ export const AssetKey = {
   PlayerSlide: "asset:player:slide",
   ObstacleSmoke: "asset:obstacle:smoke",
   ObstaclePillar: "asset:obstacle:pillar",
+  ObstacleFireSmoke: "asset:obstacle:fire_smoke",
   BackgroundBack: "asset:background:back",
   BackgroundMid: "asset:background:mid",
   BackgroundBackFlood: "asset:background:back:flood",
@@ -36,8 +37,9 @@ export const SoundKey = {
 } as const;
 
 export const GAME_IMAGE_ASSETS: Array<{ key: string; path: string }> = [
-  { key: AssetKey.ObstacleSmoke, path: "assets/obstacles/smoke.png" },
+  { key: AssetKey.ObstacleSmoke, path: "assets/obstacles/box.png" },
   { key: AssetKey.ObstaclePillar, path: "assets/obstacles/pillar.png" },
+  { key: AssetKey.ObstacleFireSmoke, path: "assets/obstacles/fire_smoke.png" },
   { key: AssetKey.BackgroundBack, path: "assets/environment/bg_far.png" },
   { key: AssetKey.BackgroundMid, path: "assets/environment/bg_mid.png" },
   { key: AssetKey.BackgroundBackFlood, path: "assets/environment/bg_fat_flood.jpg" },

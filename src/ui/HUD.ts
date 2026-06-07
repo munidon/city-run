@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { AssetKey } from "@/assets";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
 
 const FONT = "'Ramche', system-ui, sans-serif";
@@ -9,6 +10,7 @@ export class HUD {
   private healthText: Phaser.GameObjects.Text;
   private timerText: Phaser.GameObjects.Text;
   private stageLabel: Phaser.GameObjects.Text;
+  private coinIcon: Phaser.GameObjects.Image;
   private coinText: Phaser.GameObjects.Text;
   private disasterText: Phaser.GameObjects.Text;
 
@@ -31,7 +33,7 @@ export class HUD {
       .setDepth(1001);
 
     this.timerText = scene.add
-      .text(GAME_WIDTH - 36, 24, "0:00", {
+      .text(GAME_WIDTH - 104, 24, "0:00", {
         fontFamily: FONT,
         fontSize: "20px",
         color: "#ffffff",
@@ -50,14 +52,20 @@ export class HUD {
       .setScrollFactor(0)
       .setDepth(1001);
 
+    this.coinIcon = scene.add
+      .image(GAME_WIDTH - 70, 105, AssetKey.ItemCoin)
+      .setDisplaySize(30, 30)
+      .setScrollFactor(0)
+      .setDepth(1001);
+
     this.coinText = scene.add
-      .text(GAME_WIDTH - 36, 92, "🪙 0", {
+      .text(GAME_WIDTH - 36, 105, "0", {
         fontFamily: FONT,
         fontSize: "22px",
         color: "#ffd73d",
         fontStyle: "bold",
       })
-      .setOrigin(1, 0)
+      .setOrigin(1, 0.5)
       .setScrollFactor(0)
       .setDepth(1001);
 
@@ -97,7 +105,8 @@ export class HUD {
   }
 
   public setCoins(count: number): void {
-    this.coinText.setText(`🪙 ${count}`);
+    this.coinText.setText(`${count}`);
+    this.coinIcon.setX(this.coinText.x - this.coinText.width - 18);
   }
 
   public setDisasterStatus(text: string): void {

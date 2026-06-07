@@ -32,6 +32,9 @@ const FLOOD_AUTO_RESOLVE_DAMAGE = 40;
 const QUIZ_BONUS_COINS = 50;
 const ENERGY_BOOST_DURATION_MS = 5000;
 const ENERGY_SPEED_MULTIPLIER = 2;
+const HEAL_INVINCIBILITY_MS = 3000;
+const MAGNET_BASE_RADIUS = 190;
+const MAGNET_PULL_SPEED = 650;
 const ENERGY_PARTICLE_KEY = "__energy_boost_particle";
 const PAUSE_DEPTH = 1900;
 
@@ -127,11 +130,12 @@ export class GameScene extends Phaser.Scene {
 
     const maxHp = this.run.maxHp;
     this.health = new HealthSystem(maxHp, 1.5);
-    if (this.run.pendingFullHeal) {
-      this.health.reset();
-    } else if (this.run.pendingStartHpRatio !== null) {
-      this.health.damage(maxHp * (1 - this.run.pendingStartHpRatio));
-    }
+    const carriedHp = this.run.currentHp ?? maxHp;
+    let startHp = carriedHp;
+    if (this.run.pendingFullHeal) startHp = maxHp;
+    else if (this.run.pendingStartHpRatio !== null) startHp = maxHp * this.run.pendingStartHpRatio;
+    else if (this.run.pendingHealRatio !== null) startHp = carriedHp + maxHp * this.run.pendingHealRatio;
+    this.health.damage(maxHp - Phaser.Math.Clamp(startHp, 0, maxHp));
     this.stage = new StageSystem();
     this.disaster = new DisasterSystem(disasterKind);
     if (disasterKind === "flood") {
@@ -240,6 +244,7 @@ export class GameScene extends Phaser.Scene {
     this.randomSpawns.update(delta);
     this.updateScrolls();
     this.keepPlayerOnPlatform();
+    this.updateMagnetPickups();
 
     if (this.chase) {
       this.chase.setX(this.disaster.chasePosition);
@@ -306,7 +311,8 @@ export class GameScene extends Phaser.Scene {
     obs.consumed = true;
     this.iframesUntil = this.time.now + COLLISION_IFRAMES_MS;
     const supportY = this.findCurrentPlatformSupportY();
-    this.health.damage(obs.damagePct);
+    this.health.damage(this.obstacleDamage(obs.damagePct));
+    this.sound.play(SoundKey.BossHit);
     this.player.playHit();
     if (supportY !== null) this.player.snapToSupport(supportY);
     this.flashHit();
@@ -327,8 +333,12 @@ export class GameScene extends Phaser.Scene {
     item.consumed = true;
 
     if (item.healPct > 0) {
-      const heal = item.healPct * this.run.healMul * this.run.pendingRewardMul;
+      const foodHealMul = item.kind === "gimbap" || item.kind === "bento" ? this.run.healMul : 1;
+      const heal = item.healPct * foodHealMul;
       this.health.heal(heal);
+      if (this.run.enableHealInvincibility) {
+        this.iframesUntil = Math.max(this.iframesUntil, this.time.now + HEAL_INVINCIBILITY_MS);
+      }
     }
     if (item.kind === "energy_drink") {
       this.activateEnergyBoost();
@@ -372,6 +382,51 @@ export class GameScene extends Phaser.Scene {
       if (!this.disaster.isActive) this.hud.setDisasterStatus("");
       this.energyStatusTimer = undefined;
     });
+  }
+
+  private obstacleDamage(baseDamage: number): number {
+    const reductionMul = Math.max(0, 1 - this.run.damageReduction);
+    return baseDamage * reductionMul * this.run.damageTakenMul;
+  }
+
+  private updateMagnetPickups(): void {
+    if (this.run.magnetRange <= 0) return;
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
+    if (!playerBody) return;
+
+    const playerRadius = Math.max(playerBody.width, playerBody.height) / 2;
+    const magnetRadius = MAGNET_BASE_RADIUS * (1 + this.run.magnetRange);
+    const pullSpeed = MAGNET_PULL_SPEED * (1 + this.run.magnetRange);
+    for (const child of this.segments.coinGroup.getChildren()) {
+      const item = child as Item;
+      if (!item.active || item.consumed) continue;
+      const itemBody = item.body as Phaser.Physics.Arcade.Body | null;
+      if (!itemBody) continue;
+
+      const itemRadius = Math.max(itemBody.width, itemBody.height) / 2;
+      const distance = Phaser.Math.Distance.Between(
+        playerBody.center.x,
+        playerBody.center.y,
+        itemBody.center.x,
+        itemBody.center.y,
+      );
+      const pickupRadius = Math.max(28, playerRadius * 0.45 + itemRadius * 0.35);
+      if (distance <= pickupRadius) {
+        this.handleItemPickup(this.player, item);
+        continue;
+      }
+
+      if (distance <= magnetRadius) {
+        item.setData("magnetized", true);
+        item.setDepth(95);
+        const angle = Phaser.Math.Angle.Between(itemBody.center.x, itemBody.center.y, playerBody.center.x, playerBody.center.y);
+        itemBody.setVelocity(Math.cos(angle) * pullSpeed, Math.sin(angle) * pullSpeed);
+      } else if (item.getData("magnetized")) {
+        item.setData("magnetized", false);
+        item.setDepth(75);
+        itemBody.setVelocity(-this.currentSpeed(), 0);
+      }
+    }
   }
 
   private ensureEnergyParticleTexture(): string {
@@ -610,7 +665,6 @@ export class GameScene extends Phaser.Scene {
     kb?.on("keyup-DOWN", this.tryEndSlide, this);
     kb?.on("keyup-S", this.tryEndSlide, this);
     kb?.on("keydown-ESC", this.openPauseMenu, this);
-    kb?.on("keydown-R", this.restart, this);
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
   }
 
@@ -624,7 +678,6 @@ export class GameScene extends Phaser.Scene {
     kb?.off("keyup-DOWN", this.tryEndSlide, this);
     kb?.off("keyup-S", this.tryEndSlide, this);
     kb?.off("keydown-ESC", this.openPauseMenu, this);
-    kb?.off("keydown-R", this.restart, this);
     this.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
   }
 
@@ -682,7 +735,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPauseButton(): void {
-    const x = GAME_WIDTH - 112;
+    const x = GAME_WIDTH - 58;
     const y = 36;
     const bg = this.add
       .rectangle(0, 0, 44, 38, 0x111128, 0.72)
@@ -895,7 +948,7 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = true;
     this.stopEnergyBoostParticles();
     this.stopBgm();
-    this.showOverlay("💀 사망", `획득 코인: ${this.coins}\n탭 또는 R: 재시작 / ESC: 메뉴`);
+    this.showOverlay("💀 사망", `획득 코인: ${this.coins}\n탭: 재시작 / ESC: 메뉴`);
   }
 
   private handleCheckpoint(cp: number): void {
@@ -988,17 +1041,31 @@ export class GameScene extends Phaser.Scene {
     this.sound.play(SoundKey.StageClear);
     this.stopBgm();
     this.run.totalCoins += this.stageCoinDelta;
+    this.run.currentHp = this.health.value;
     this.run.consumeOneShots();
+    if (this.run.stageIndex === 2 && this.disaster.kind === "flood") {
+      this.scene.start("FinalScoreScene", {
+        run: this.run,
+        stageCoins: this.stageCoinDelta,
+        remainingHp: this.health.value,
+        maxHp: this.health.maxValue,
+      });
+      return;
+    }
     this.showOverlay(
       "✨ 스테이지 클리어",
-      `이번 스테이지 +${this.stageCoinDelta} 코인 (누적 ${this.run.totalCoins})\n탭 / Space — 카드 선택`,
+      `이번 스테이지 +${this.stageCoinDelta} 코인 (누적 ${this.run.totalCoins})\n확인 버튼을 누르면 카드 선택으로 이동`,
     );
     const advance = () => this.scene.start("CardSelectScene", { run: this.run });
-    this.input.keyboard?.once("keydown-SPACE", advance);
-    this.input.keyboard?.once("keydown-ENTER", advance);
-    this.time.delayedCall(800, () => {
-      this.input.once(Phaser.Input.Events.POINTER_DOWN, advance);
-    });
+    makeButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 145, "확인", advance, {
+      width: 240,
+      height: 58,
+      bgColor: 0x2d6a4f,
+      fontSize: "26px",
+      textColor: "#d8f3dc",
+    })
+      .setDepth(2002)
+      .setScrollFactor(0);
   }
 
   private showOverlay(title: string, subtitle: string): void {

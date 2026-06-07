@@ -45,7 +45,7 @@ const ITEM_LABELS: Record<PlaceableItemKind, string> = {
   wet_towel: "젖은수건",
 };
 const OBSTACLE_LABELS: Record<ObstacleKind, string> = {
-  smoke: "연기",
+  smoke: "박스",
   pillar: "기둥",
   fire_smoke: "슬라이드연기",
 };

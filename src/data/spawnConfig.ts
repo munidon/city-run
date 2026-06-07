@@ -14,12 +14,12 @@ export const RANDOM_ITEM_SPAWN: RandomSpawnConfig & {
   weights: Record<ItemKind, number>;
   suppressDuringDisaster: Partial<Record<ItemKind, boolean>>;
 } = {
-  interval: { minMs: 1400, maxMs: 2200 },
+  interval: { minMs: 2200, maxMs: 3400 },
   // 확률 조정은 여기 숫자만 바꾸면 됩니다. 0이면 스폰되지 않습니다.
   weights: {
-    gimbap: 4,
+    gimbap: 5,
     bento: 2,
-    coin: 5,
+    coin: 0,
     energy_drink: 1,
     fire_extinguisher: 1,
     gas_mask: 2,

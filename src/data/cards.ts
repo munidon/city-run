@@ -1,7 +1,7 @@
 import { RunState } from "@/state/RunState";
 
 export type CardCategory = "permanent" | "one_shot" | "risk_reward";
-export type CardRarity = "common" | "rare" | "legendary";
+export type CardRarity = "common" | "rare" | "epic" | "legendary";
 
 export interface Card {
   id: string;
@@ -17,37 +17,67 @@ export const ALL_CARDS: Card[] = [
     id: "p-hp-up",
     category: "permanent",
     rarity: "common",
-    title: "체력 +20%",
-    description: "최대 체력이 20% 증가합니다. 영구.",
+    title: "기초 체력 보강",
+    description: "최대 체력이 15% 증가합니다. 영구.",
     apply: (run) => {
-      run.maxHpBonus += 0.2;
+      run.maxHpBonus += 0.15;
     },
   },
   {
-    id: "p-coin-up",
+    id: "p-coin-up-common",
     category: "permanent",
     rarity: "common",
-    title: "코인 +50%",
-    description: "코인 획득량이 50% 증가합니다. 영구.",
+    title: "가벼운 지갑",
+    description: "코인 획득량이 15% 증가합니다. 영구.",
     apply: (run) => {
-      run.coinMul *= 1.5;
+      run.coinMul *= 1.15;
     },
   },
   {
-    id: "p-heal-up",
+    id: "o-heal-half",
+    category: "one_shot",
+    rarity: "common",
+    title: "응급 처치",
+    description: "다음 스테이지를 최대 체력의 50%가 회복된 상태로 시작합니다.",
+    apply: (run) => {
+      run.pendingHealRatio = 0.5;
+    },
+  },
+  {
+    id: "p-shield-common",
+    category: "permanent",
+    rarity: "common",
+    title: "안전모 착용",
+    description: "장애물 충돌 시 받는 피해량이 10% 감소합니다. 영구.",
+    apply: (run) => {
+      run.damageReduction += 0.1;
+    },
+  },
+  {
+    id: "p-coin-up-rare",
     category: "permanent",
     rarity: "rare",
-    title: "회복량 +40%",
-    description: "빵·도시락 회복량이 40% 증가합니다. 영구.",
+    title: "황금 구두",
+    description: "코인 획득량이 40% 증가합니다. 영구.",
     apply: (run) => {
-      run.healMul *= 1.4;
+      run.coinMul *= 1.4;
+    },
+  },
+  {
+    id: "p-magnet-rare",
+    category: "permanent",
+    rarity: "rare",
+    title: "자석 배낭",
+    description: "아이템 및 코인 흡수 범위가 30% 증가합니다. 영구.",
+    apply: (run) => {
+      run.magnetRange += 0.3;
     },
   },
   {
     id: "o-fullheal",
     category: "one_shot",
-    rarity: "common",
-    title: "풀 체력 시작",
+    rarity: "rare",
+    title: "긴급 수송",
     description: "다음 스테이지를 풀 체력으로 시작합니다.",
     apply: (run) => {
       run.pendingFullHeal = true;
@@ -57,8 +87,8 @@ export const ALL_CARDS: Card[] = [
     id: "o-double-coin",
     category: "one_shot",
     rarity: "rare",
-    title: "다음 스테이지 코인 2배",
-    description: "다음 1스테이지 동안 코인 획득량 2배.",
+    title: "벼락부자",
+    description: "다음 1스테이지 동안 코인 획득량이 2배가 됩니다.",
     apply: (run) => {
       run.pendingDoubleCoin = true;
     },
@@ -66,12 +96,35 @@ export const ALL_CARDS: Card[] = [
   {
     id: "r-low-hp",
     category: "risk_reward",
-    rarity: "rare",
-    title: "체력 -20% / 보상 2배",
-    description: "다음 스테이지 80% 체력으로 시작, 모든 보상이 2배.",
+    rarity: "epic",
+    title: "배수진",
+    description: "다음 스테이지를 50% 체력으로 시작하지만, 스테이지 클리어 보상이 2.5배가 됩니다.",
     apply: (run) => {
-      run.pendingStartHpRatio = 0.8;
-      run.pendingRewardMul *= 2;
+      run.pendingStartHpRatio = 0.5;
+      run.pendingRewardMul *= 2.5;
+    },
+  },
+  {
+    id: "r-glass-cannon",
+    category: "risk_reward",
+    rarity: "epic",
+    title: "유리 몸과 초고속 부스터",
+    description: "점수 및 코인 획득량이 60% 증가하지만, 충돌 피해량이 2배가 됩니다. 영구.",
+    apply: (run) => {
+      run.coinMul *= 1.6;
+      run.scoreMul *= 1.6;
+      run.damageTakenMul *= 2;
+    },
+  },
+  {
+    id: "p-scavenger",
+    category: "permanent",
+    rarity: "epic",
+    title: "도시의 미식가",
+    description: "빵·도시락 회복량이 50% 증가하며, 회복 시 3초간 무적 상태가 됩니다. 영구.",
+    apply: (run) => {
+      run.healMul *= 1.5;
+      run.enableHealInvincibility = true;
     },
   },
 ];

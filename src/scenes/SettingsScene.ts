@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { SoundKey } from "@/assets";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config";
+import { isDevToolsUnlocked } from "@/devUnlock";
 import { getBgmVolume, setBgmVolume } from "@/settings";
 import { makeButton } from "@/ui/button";
 
@@ -74,13 +75,15 @@ export class SettingsScene extends Phaser.Scene {
 
     this.createVolumeSlider(cx, cy - 80);
 
-    makeButton(this, cx, cy + 30, "에셋 미리보기", () => this.scene.start("AssetPreviewScene"), {
-      width: 200,
-      height: 50,
-      bgColor: 0x2a3a5a,
-      fontSize: "22px",
-      textColor: "#ffffff",
-    });
+    if (isDevToolsUnlocked()) {
+      makeButton(this, cx, cy + 30, "에셋 미리보기", () => this.scene.start("AssetPreviewScene"), {
+        width: 200,
+        height: 50,
+        bgColor: 0x2a3a5a,
+        fontSize: "22px",
+        textColor: "#ffffff",
+      });
+    }
 
     this.add.rectangle(cx, GAME_HEIGHT - 64, GAME_WIDTH - 200, 1, 0x222244);
 
@@ -118,9 +121,9 @@ export class SettingsScene extends Phaser.Scene {
     let dragging = false;
 
     this.add
-      .text(cx, y - 44, "배경음", {
+      .text(cx, y - 44, "음량", {
         fontFamily: FONT,
-        fontSize: "24px",
+        fontSize: "40px",
         color: "#ccccff",
       })
       .setOrigin(0.5);
@@ -142,7 +145,7 @@ export class SettingsScene extends Phaser.Scene {
     const valueText = this.add
       .text(cx, y + 38, "", {
         fontFamily: FONT,
-        fontSize: "18px",
+        fontSize: "30px",
         color: "#aaaacc",
       })
       .setOrigin(0.5);

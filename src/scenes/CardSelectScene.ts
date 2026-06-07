@@ -22,6 +22,7 @@ const CATEGORY_LABEL: Record<CardCategory, string> = {
 const RARITY_LABEL: Record<string, string> = {
   common: "일반",
   rare: "희귀",
+  epic: "영웅",
   legendary: "전설",
 };
 

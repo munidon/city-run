@@ -21,13 +21,13 @@ interface ItemSpec {
 }
 
 const SPECS: Record<ItemKind, ItemSpec> = {
-  gimbap: { size: 64, hitSize: 32, healPct: 2, coins: 0, color: 0xf5c98a, accent: 0xb47b3b, label: "G" },
-  bento: { size: 64, hitSize: 32, healPct: 5, coins: 0, color: 0xff7a59, accent: 0xffffff, label: "B" },
+  gimbap: { size: 64, hitSize: 32, healPct: 4, coins: 0, color: 0xf5c98a, accent: 0xb47b3b, label: "G" },
+  bento: { size: 64, hitSize: 32, healPct: 9, coins: 0, color: 0xff7a59, accent: 0xffffff, label: "B" },
   coin: { size: 48, hitSize: 24, healPct: 0, coins: 1, color: 0xffd73d, accent: 0xb38600, label: "$" },
-  energy_drink: { size: 80, hitSize: 32, healPct: 3, coins: 0, color: 0x2dd4bf, accent: 0xffffff, label: "E" },
-  fire_extinguisher: { size: 80, hitSize: 32, healPct: 12, coins: 0, color: 0xdc2626, accent: 0xffffff, label: "F" },
-  gas_mask: { size: 80, hitSize: 32, healPct: 8, coins: 0, color: 0x334155, accent: 0xa3e635, label: "M" },
-  wet_towel: { size: 80, hitSize: 32, healPct: 6, coins: 0, color: 0x38bdf8, accent: 0xffffff, label: "T" },
+  energy_drink: { size: 80, hitSize: 32, healPct: 0, coins: 0, color: 0x2dd4bf, accent: 0xffffff, label: "E" },
+  fire_extinguisher: { size: 80, hitSize: 32, healPct: 8, coins: 0, color: 0xdc2626, accent: 0xffffff, label: "F" },
+  gas_mask: { size: 80, hitSize: 32, healPct: 6, coins: 0, color: 0x334155, accent: 0xa3e635, label: "M" },
+  wet_towel: { size: 80, hitSize: 32, healPct: 5, coins: 0, color: 0x38bdf8, accent: 0xffffff, label: "T" },
 };
 
 const ASSET_KEYS: Record<ItemKind, string> = {

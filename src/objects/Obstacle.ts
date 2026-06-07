@@ -13,6 +13,7 @@ interface ObstacleSpec {
   spawnY: number;
   gravity: boolean;
   label: string;
+  visualBottomInset?: number;
 }
 
 const SPECS: Record<ObstacleKind, ObstacleSpec> = {
@@ -25,6 +26,7 @@ const SPECS: Record<ObstacleKind, ObstacleSpec> = {
     spawnY: GROUND_Y - 46,
     gravity: false,
     label: "📦",
+    visualBottomInset: 10,
   },
   pillar: {
     width: 92,
@@ -38,7 +40,7 @@ const SPECS: Record<ObstacleKind, ObstacleSpec> = {
   },
   fire_smoke: {
     width: 220,
-    height: 110,
+    height: 220,
     damagePct: 12,
     color: 0x2f3038,
     accent: 0xff6a2a,
@@ -51,6 +53,7 @@ const SPECS: Record<ObstacleKind, ObstacleSpec> = {
 const ASSET_KEYS: Partial<Record<ObstacleKind, string>> = {
   smoke: AssetKey.ObstacleSmoke,
   pillar: AssetKey.ObstaclePillar,
+  fire_smoke: AssetKey.ObstacleFireSmoke,
 };
 
 export class Obstacle extends Phaser.Physics.Arcade.Sprite {
@@ -61,7 +64,7 @@ export class Obstacle extends Phaser.Physics.Arcade.Sprite {
   constructor(scene: Phaser.Scene, x: number, kind: ObstacleKind, y?: number) {
     const spec = SPECS[kind];
     const tex = Obstacle.ensureTexture(scene, kind, spec);
-    super(scene, x, y ?? spec.spawnY, tex);
+    super(scene, x, (y ?? spec.spawnY) + (spec.visualBottomInset ?? 0), tex);
 
     this.kind = kind;
     this.damagePct = spec.damagePct;

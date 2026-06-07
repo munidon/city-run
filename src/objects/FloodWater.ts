@@ -8,7 +8,7 @@ export class FloodWater {
   private readonly graphics: Phaser.GameObjects.Graphics;
 
   constructor(private readonly scene: Phaser.Scene) {
-    this.graphics = scene.add.graphics().setScrollFactor(0).setDepth(60);
+    this.graphics = scene.add.graphics().setScrollFactor(0).setDepth(950);
     this.update(HIDDEN_Y);
   }
 
@@ -19,7 +19,7 @@ export class FloodWater {
 
     const phase = this.scene.time.now / 260;
 
-    this.graphics.fillStyle(0x1377d4, 0.5);
+    this.graphics.fillStyle(0x1377d4, 0.36);
     this.graphics.beginPath();
     this.graphics.moveTo(0, GAME_HEIGHT + 80);
     this.graphics.lineTo(0, this.waveY(0, topY, phase));
@@ -32,7 +32,7 @@ export class FloodWater {
     this.graphics.closePath();
     this.graphics.fillPath();
 
-    this.graphics.lineStyle(5, 0x9be7ff, 0.75);
+    this.graphics.lineStyle(5, 0x9be7ff, 0.55);
     this.graphics.beginPath();
     this.graphics.moveTo(0, this.waveY(0, topY, phase));
     for (let x = 0; x <= GAME_WIDTH + WAVE_STEP; x += WAVE_STEP) {
@@ -40,7 +40,7 @@ export class FloodWater {
     }
     this.graphics.strokePath();
 
-    this.graphics.fillStyle(0x9be7ff, 0.18);
+    this.graphics.fillStyle(0x9be7ff, 0.12);
     for (let x = 24; x < GAME_WIDTH; x += 112) {
       const y = this.waveY(x, topY, phase) + 32 + ((x / 7 + phase * 9) % 36);
       this.graphics.fillRoundedRect(x, y, 54, 8, 4);

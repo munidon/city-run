@@ -120,7 +120,7 @@ export class AssetPreviewScene extends Phaser.Scene {
     });
 
     return [
-      this.makeEntry("Smoke", smoke),
+      this.makeEntry("Box", smoke),
       this.makeEntry("Pillar", pillar),
       this.makeEntry("Fire Smoke (slide)", fireSmoke),
       ...platforms,

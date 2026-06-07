@@ -7,8 +7,9 @@ Recommended export sizes:
 - `obstacles/flame.svg`: 56x84
 - `obstacles/falling-debris.svg`: 64x64
 - `obstacles/low-bar.svg`: 110x30
-- `obstacles/smoke.png`: 110x92 display target
+- `obstacles/box.png`: 110x92 display target
 - `obstacles/pillar.png`: 92x170 display target
+- `obstacles/fire_smoke.png`: 220x110 display target
 - `items/bread.svg`: 38x38
 - `items/lunchbox.svg`: 48x48
 - `items/coin.svg`: 32x32
