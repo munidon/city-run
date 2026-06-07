@@ -14,9 +14,9 @@ const CATEGORY_COLOR: Record<CardCategory, number> = {
 };
 
 const CATEGORY_LABEL: Record<CardCategory, string> = {
-  permanent: "🟢 영구 패시브",
-  one_shot: "🟡 일회성 강화",
-  risk_reward: "🔴 리스크-리워드",
+  permanent: "🟢 패시브",
+  one_shot: "🟡 일시강화",
+  risk_reward: "🔴 도전",
 };
 
 const RARITY_LABEL: Record<string, string> = {
@@ -59,9 +59,9 @@ export class CardSelectScene extends Phaser.Scene {
         130,
         `누적 코인: 🪙 ${this.run.totalCoins}  ·  다음 재난: ${disasterLabel(disasterForStage(this.run.stageIndex + 1))}`,
         {
-        fontFamily: FONT,
-        fontSize: "20px",
-        color: "#cccccc",
+          fontFamily: FONT,
+          fontSize: "20px",
+          color: "#cccccc",
         },
       )
       .setOrigin(0.5);
