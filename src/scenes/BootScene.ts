@@ -38,9 +38,17 @@ export class BootScene extends Phaser.Scene {
       repeat: -1,
     });
 
-    // 게임 애셋 로드 완료 후 폰트까지 준비되면 메인 메뉴 진입
-    document.fonts.load("72px 'Ramche'").finally(() => {
+    const enterMainMenu = () => {
       this.scene.start("MainMenuScene");
-    });
+      this.game.events.emit("city-run:boot-complete");
+    };
+
+    if (new URLSearchParams(window.location.search).has("shot")) {
+      enterMainMenu();
+      return;
+    }
+
+    // 게임 애셋 로드 완료 후 폰트까지 준비되면 메인 메뉴 진입
+    document.fonts.load("72px 'Ramche'").finally(enterMainMenu);
   }
 }

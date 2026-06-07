@@ -8,11 +8,40 @@ import { FinalScoreScene } from "@/scenes/FinalScoreScene";
 import { SettingsScene } from "@/scenes/SettingsScene";
 import { AssetPreviewScene } from "@/scenes/AssetPreviewScene";
 import { MapEditorScene } from "@/scenes/MapEditorScene";
+import { PresentationShotScene } from "@/scenes/PresentationShotScene";
 import { isDevToolsUnlocked } from "@/devUnlock";
 import { RunState } from "@/state/RunState";
 
+type ScreenshotMode =
+  | "play-fire"
+  | "fire-disaster"
+  | "fire-quiz"
+  | "play-flood"
+  | "flood-disaster"
+  | "energy-boost"
+  | "checkpoint-50"
+  | "checkpoint-80"
+  | "pause-menu"
+  | "resume-countdown"
+  | "player-run"
+  | "player-jump"
+  | "player-slide"
+  | "player-hit"
+  | "items"
+  | "obstacles"
+  | "quiz-correct"
+  | "quiz-wrong"
+  | "map-flat"
+  | "map-platforms"
+  | "map-high"
+  | "card"
+  | "final";
+
+const urlParams = new URLSearchParams(window.location.search);
+const shotMode = urlParams.get("shot") as ScreenshotMode | null;
+
 const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
+  type: shotMode ? Phaser.CANVAS : Phaser.AUTO,
   parent: PARENT_ID,
   backgroundColor: BACKGROUND_COLOR,
   pixelArt: true,
@@ -41,21 +70,11 @@ const config: Phaser.Types.Core.GameConfig = {
     CardSelectScene,
     FinalScoreScene,
     MapEditorScene,
+    PresentationShotScene,
   ],
 };
 
 const game = new Phaser.Game(config);
-
-type ScreenshotMode =
-  | "play-fire"
-  | "fire-disaster"
-  | "fire-quiz"
-  | "play-flood"
-  | "flood-disaster"
-  | "card"
-  | "final";
-
-const shotMode = new URLSearchParams(window.location.search).get("shot") as ScreenshotMode | null;
 
 function makeDemoRun(stageIndex: number): RunState {
   const run = new RunState();
@@ -79,7 +98,15 @@ function startDemoGame(mode: ScreenshotMode, run: RunState): void {
         };
         floodWater?: { update: (levelY: number) => void };
         health: { set: (value: number) => void };
-        hud: { setCoins: (value: number) => void; setDisasterStatus: (text: string) => void };
+        hud: {
+          setCoins: (value: number) => void;
+          setDisasterStatus: (text: string) => void;
+          setProgress: (value: number) => void;
+        };
+        activateEnergyBoost: () => void;
+        handleCheckpoint: (checkpoint: number) => void;
+        openPauseMenu: () => void;
+        startResumeCountdown: () => void;
         openQuiz: () => void;
       };
 
@@ -96,6 +123,19 @@ function startDemoGame(mode: ScreenshotMode, run: RunState): void {
         demo.disaster.floodY = 470;
         demo.floodWater?.update(470);
         demo.hud.setDisasterStatus("🌊 홍수 발생 — 높은 발판과 두루마리를 찾아라!");
+      } else if (mode === "energy-boost") {
+        demo.activateEnergyBoost();
+      } else if (mode === "checkpoint-50") {
+        demo.hud.setProgress(0.5);
+        demo.handleCheckpoint(0.5);
+      } else if (mode === "checkpoint-80") {
+        demo.hud.setProgress(0.8);
+        demo.handleCheckpoint(0.8);
+      } else if (mode === "pause-menu") {
+        demo.openPauseMenu();
+      } else if (mode === "resume-countdown") {
+        demo.openPauseMenu();
+        gameScene.time.delayedCall(250, () => demo.startResumeCountdown());
       }
     });
   });
@@ -105,6 +145,17 @@ function startDemoGame(mode: ScreenshotMode, run: RunState): void {
 
 function startScreenshotMode(mode: ScreenshotMode): void {
   const menu = game.scene.getScene("MainMenuScene");
+
+  if (
+    mode.startsWith("player-") ||
+    mode === "items" ||
+    mode === "obstacles" ||
+    mode.startsWith("quiz-") ||
+    mode.startsWith("map-")
+  ) {
+    menu?.scene.start("PresentationShotScene", { mode });
+    return;
+  }
 
   if (mode === "card") {
     const run = makeDemoRun(1);
@@ -130,23 +181,17 @@ function startScreenshotMode(mode: ScreenshotMode): void {
 }
 
 if (shotMode) {
-  game.events.once("ready", () => {
-    const boot = game.scene.getScene("BootScene");
-    boot?.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      window.setTimeout(() => startScreenshotMode(shotMode), 80);
-    });
+  game.events.once("city-run:boot-complete", () => {
+    window.setTimeout(() => startScreenshotMode(shotMode), 80);
   });
 }
 
 // URL에 ?editor=1 이 있으면 BootScene 완료 후 에디터로 진입
-const wantEditor = new URLSearchParams(window.location.search).get("editor") === "1" && isDevToolsUnlocked();
+const wantEditor = urlParams.get("editor") === "1" && isDevToolsUnlocked();
 if (wantEditor && !shotMode) {
-  game.events.once("ready", () => {
-    const boot = game.scene.getScene("BootScene");
-    boot?.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      const menu = game.scene.getScene("MainMenuScene");
-      menu?.scene.start("MapEditorScene");
-    });
+  game.events.once("city-run:boot-complete", () => {
+    const menu = game.scene.getScene("MainMenuScene");
+    menu?.scene.start("MapEditorScene");
   });
 }
 

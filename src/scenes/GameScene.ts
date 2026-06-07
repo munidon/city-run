@@ -1054,7 +1054,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.showOverlay(
       "✨ 스테이지 클리어",
-      `이번 스테이지 +${this.stageCoinDelta} 코인 (누적 ${this.run.totalCoins})\n확인 버튼을 누르면 카드 선택으로 이동`,
+      `이번 스테이지 +${this.stageCoinDelta} 코인 (누적 ${this.run.totalCoins})`,
     );
     const advance = () => this.scene.start("CardSelectScene", { run: this.run });
     makeButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 145, "확인", advance, {
